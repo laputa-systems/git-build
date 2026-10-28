@@ -41,7 +41,14 @@ To upgrade Git, update `version=` and `archive_sha256=` in
 The Dockerfile runs `test/runtime.sh` in a clean Alpine stage before exporting
 the artifacts. The harness checks static linking, runtime-prefix relocation,
 configuration, repository operations, maintenance commands, helper layout,
-and omitted features.
+and omitted features. It also asserts that HTTPS remotes fail naming the
+missing remote helper.
+
+Run `sh scripts/package.sh <bin_dir> <triple> <out_dir>` to write
+`git-<triple>.zip` plus a build manifest (upstream version, archive SHA-256,
+target, build commit, toolchain) and refresh the verified `SHA256SUMS` in
+`out_dir`. `sh scripts/qualify-binaries.sh <bin_dir>` qualifies final bytes
+before packaging.
 
 The manual GitHub Actions release workflow in `.github/workflows/release.yml`
 publishes prerelease tarballs for native `macos-26`, Linux arm64, and Linux

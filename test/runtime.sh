@@ -3,7 +3,6 @@ set -eu
 
 bin_dir=${GIT_BIN_DIR:-/usr/local/bin}
 git="$bin_dir/git"
-expected_exec_path=${GIT_EXPECTED_EXEC_PATH:-$bin_dir}
 if [ -n "${GIT_EXPECTED_VERSION:-}" ]; then
     expected_version=$GIT_EXPECTED_VERSION
 else
@@ -14,7 +13,19 @@ fi
 test -x "$git"
 test -n "$expected_version"
 test "$("$git" --version)" = "git version $expected_version"
-test "$("$git" --exec-path)" = "$expected_exec_path"
+
+exec_path=$("$git" --exec-path)
+if [ -n "${GIT_EXPECTED_EXEC_PATH:-}" ]; then
+    test "$exec_path" = "$GIT_EXPECTED_EXEC_PATH"
+else
+    case "$exec_path" in
+        /*) ;;
+        *) echo "exec-path $exec_path is not absolute" >&2; exit 1 ;;
+    esac
+    case "$exec_path" in
+        "$bin_dir"/*) echo "exec-path $exec_path tracks $bin_dir, want relocatable" >&2; exit 1 ;;
+    esac
+fi
 
 check_linkage() {
     case "$(uname -s)" in
@@ -58,6 +69,15 @@ export XDG_CONFIG_HOME="$test_home/.config"
 export PATH="$bin_dir:$PATH"
 mkdir -p "$XDG_CONFIG_HOME/git"
 : > "$XDG_CONFIG_HOME/git/config"
+
+if GIT_TERMINAL_PROMPT=0 git ls-remote https://127.0.0.1/no-such-repo.git 2>"$test_home/https.err"; then
+    echo "https remote unexpectedly succeeded without curl support" >&2
+    exit 1
+fi
+grep -q "remote helper" "$test_home/https.err" || {
+    echo "https failure does not name the missing remote helper" >&2
+    exit 1
+}
 
 git config --global user.name "Joshua Li"
 git config --global user.email joshuarli98@gmail.com
