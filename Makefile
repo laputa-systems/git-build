@@ -2,7 +2,7 @@ DOCKER_BUILD ?= docker buildx build
 DOCKER_BUILD_CACHE_ARGS ?=
 DOCKER_PLATFORM ?= linux/arm64
 
-GIT_VERSION ?= 2.55.0
+GIT_VERSION ?= 2.56.0
 GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
 
 MACOS_DIST ?= dist/macos

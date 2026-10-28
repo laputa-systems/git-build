@@ -37,11 +37,11 @@ WORKDIR /src
 
 # BuildKit fetches and unpacks the official release archive. Its SHA-256 keeps
 # the source immutable without putting a downloader or CA bundle in the image.
-ADD --checksum=sha256:457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357 \
+ADD --checksum=sha256:26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3 \
     --unpack=true \
-    https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz /src/
+    https://www.kernel.org/pub/software/scm/git/git-2.56.0.tar.xz /src/
 
-WORKDIR /src/git-2.55.0
+WORKDIR /src/git-2.56.0
 
 # musl does not expose REG_STARTEND; use Git's compatibility regex.
 RUN set -eux; \

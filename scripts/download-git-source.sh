@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-version=2.55.0
+version=2.56.0
 archive_url="https://www.kernel.org/pub/software/scm/git/git-$version.tar.xz"
-archive_sha256=457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357
+archive_sha256=26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)

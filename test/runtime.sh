@@ -6,7 +6,7 @@ git="$bin_dir/git"
 expected_exec_path=${GIT_EXPECTED_EXEC_PATH:-$bin_dir}
 
 test -x "$git"
-test "$("$git" --version)" = "git version 2.55.0"
+test "$("$git" --version)" = "git version 2.56.0"
 test "$("$git" --exec-path)" = "$expected_exec_path"
 
 check_linkage() {
