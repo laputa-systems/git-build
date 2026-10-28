@@ -5,9 +5,9 @@
 Goal: minimal Git 2.56.0 for macOS arm64 + static Linux musl, published as
 qualified SHA-tagged ZIP prereleases, installable via `usr/dl`.
 Base: `08204cc` (Git 2.56.0, no diff-pretty), branch `master`, tree clean.
-Accepted: none yet (preflight). Red: none on the integration branch.
-Next: A1. Resume: pick the next open item in **Sequence**, brief per the
-orchestrate run-a-slice contract, steer after each accept.
+Accepted: A1, A2, A3, B2, B1, D1 (done). Red: none.
+Next: C (parked behind the owner hard stop); D2 parked behind C.
+Resume: C needs the owner's publish command; see Needs environment.
 No README.md exists in `git-minimal-musl-static`; AGENTS.md is the doc.
 
 ## Charter
