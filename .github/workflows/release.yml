@@ -80,6 +80,14 @@ jobs:
         run: |
           sh scripts/package.sh dist/macos "${{ matrix.triple }}" out/
 
+      - name: Exercise macOS distribution from its ZIP
+        if: matrix.kind == 'macos'
+        run: |
+          rm -rf zipcheck
+          mkdir zipcheck
+          unzip -q "out/git-${{ matrix.triple }}.zip" -d zipcheck
+          GIT_BIN_DIR="$PWD/zipcheck" sh test/runtime.sh
+
       - name: Build Linux distribution
         if: matrix.kind == 'linux'
         run: |
@@ -90,6 +98,14 @@ jobs:
         if: matrix.kind == 'linux'
         run: |
           sh scripts/package.sh dist "${{ matrix.triple }}" out/
+
+      - name: Exercise Linux distribution from its ZIP
+        if: matrix.kind == 'linux'
+        run: |
+          rm -rf zipcheck
+          mkdir zipcheck
+          unzip -q "out/git-${{ matrix.triple }}.zip" -d zipcheck
+          GIT_BIN_DIR="$PWD/zipcheck" sh test/runtime.sh
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

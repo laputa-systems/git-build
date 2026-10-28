@@ -25,6 +25,9 @@ To upgrade Git, update `version=` and `archive_sha256=` in
 `scripts/download-git-source.sh`, run it to refresh `src/`, then verify with
 `make macos` and `make git`.
 
+`test/runtime.sh` also exercises bare-remote clone/push/fetch/merge/rebase;
+release jobs rerun it against each extracted ZIP.
+
 Releases come from `.github/workflows/release.yml` (manual dispatch, three
 matrix triples, verified `SHA256SUMS`); `sh scripts/audit-release.sh` checks
 the workflow contract. The build manifest format lives in

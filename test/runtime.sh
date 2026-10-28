@@ -116,3 +116,70 @@ git prune
 git commit-graph write --reachable --changed-paths
 git multi-pack-index write --bitmap
 test -z "$(git status --short)"
+
+upstream="$test_home/upstream.git"
+git init --bare -q --template= "$upstream"
+git clone -q --template= "$upstream" "$test_home/clone-a"
+cd "$test_home/clone-a"
+git checkout -qb work
+printf '%s\n' one > file.txt
+git add file.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm one
+git push -q origin work
+git --git-dir="$upstream" symbolic-ref -q HEAD refs/heads/work
+git clone -q --template= "$upstream" "$test_home/clone-b"
+cd "$test_home/clone-b"
+git checkout -q -B work origin/work
+printf '%s\n' two >> file.txt
+git add file.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm two
+git push -q origin work
+cd "$test_home/clone-a"
+printf '%s\n' three > side.txt
+git add side.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm three
+git fetch -q origin
+git rebase -q origin/work
+test "$(cat file.txt)" = "$(printf 'one\ntwo')"
+test "$(cat side.txt)" = three
+git push -q origin work
+printf '%s\n' five >> side.txt
+git add side.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm five
+cd "$test_home/clone-b"
+printf '%s\n' four >> file.txt
+git add file.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm four
+git fetch -q origin
+git rebase -q origin/work
+git push -q origin work
+cd "$test_home/clone-a"
+git fetch -q origin
+git merge -q -m merge-upstream origin/work
+test "$(git rev-list --merges --count HEAD)" = 1
+test "$(cat file.txt)" = "$(printf 'one\ntwo\nfour')"
+test "$(cat side.txt)" = "$(printf 'three\nfive')"
+git push -q origin work
+test -z "$(git status --short)"
+cd "$repo"
+test -z "$(git status --short)"
