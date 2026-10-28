@@ -79,6 +79,11 @@ if [ "$kind" = "elf" ]; then
         echo "$versions" | grep -q "GLIBC" && fail "$bin references glibc"
 
         machine=$(readelf -h "$bin" | sed -n 's/^ *Machine: *//p')
+        etype=$(readelf -h "$bin" | sed -n 's/^ *Type: *//p')
+        case "$etype" in
+            DYN*) ;;
+            *) fail "$bin has ELF type $etype, want DYN (static PIE)" ;;
+        esac
         case "$machine" in
             "Advanced Micro Devices X86-64")
                 elf_arch=x86_64
@@ -90,14 +95,14 @@ if [ "$kind" = "elf" ]; then
                 fail "$bin has unexpected machine $machine"
                 ;;
         esac
-        note "$name: ELF $machine, static (no INTERP/NEEDED)"
+        note "$name: ELF $machine $etype, static PIE (no INTERP/NEEDED)"
 
         stack_flags=$(echo "$headers" | awk '$1 == "GNU_STACK" { print $(NF-1)$NF }')
         case "$stack_flags" in
             *E*) fail "$bin has executable stack ($stack_flags)" ;;
         esac
 
-        echo "$headers" | awk '$1 == "LOAD" && $(NF-1) ~ /W/ && $NF ~ /E/ { found=1 } END { exit !found }' \
+        echo "$headers" | awk '$1 == "LOAD" { flags=""; for (i = 7; i < NF; i++) flags = flags $i; if (flags ~ /W/ && flags ~ /E/) found=1 } END { exit !found }' \
             && fail "$bin has a W+X LOAD segment"
 
         echo "$headers" | grep -q "GNU_RELRO" || fail "$bin has no GNU_RELRO"
