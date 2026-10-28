@@ -10,10 +10,12 @@ Perl, Python, gettext, Expat, cURL, Gitweb, and Rust are omitted.
 ## Install
 
 Get `git-<triple>.zip` and `SHA256SUMS` from the
-[prereleases](https://github.com/laputa-systems/git-build/releases), then:
+[prereleases](https://github.com/laputa-systems/git-build/releases), then
+check just your asset and install it:
 
 ```sh
-shasum -a 256 -c SHA256SUMS
+grep -F 'git-aarch64-apple-darwin.zip' SHA256SUMS > CHECKSUM
+shasum -a 256 -c CHECKSUM
 unzip git-aarch64-apple-darwin.zip -d ~/.local/bin
 ```
 

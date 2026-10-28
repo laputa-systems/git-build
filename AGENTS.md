@@ -18,7 +18,8 @@ Invariants: `version=` in `scripts/download-git-source.sh` is the only
 version string — `Makefile`, `Dockerfile`, and `test/runtime.sh` derive from
 it. Every target ships the same five files: `git`, `git-shell`, and three
 relative helper symlinks to `git`. HTTPS remotes must fail naming the missing
-remote helper.
+remote helper. SSH-only transport is a product decision: never reintroduce
+libcurl or a TLS stack to regain HTTPS.
 
 To upgrade Git, update `version=` and `archive_sha256=` in
 `scripts/download-git-source.sh`, run it to refresh `src/`, then verify with
