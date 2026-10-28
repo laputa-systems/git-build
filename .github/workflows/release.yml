@@ -73,7 +73,9 @@ jobs:
 
       - name: Build macOS distribution
         if: matrix.kind == 'macos'
-        run: make macos
+        run: |
+          ./scripts/download-git-source.sh
+          make macos
 
       - name: Package macOS distribution
         if: matrix.kind == 'macos'

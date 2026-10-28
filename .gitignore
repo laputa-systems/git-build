@@ -1,8 +1,9 @@
 /dist/
 
-# Keep the downloaded release archive out of the repository. The source tree
-# itself is the checked-in development input.
+# The upstream source archive and its trimmed extraction are fetched and
+# verified by scripts/download-git-source.sh; neither is checked in.
 /src/*.tar.xz
+/src/git-*/
 
 # Git's in-tree build products. Keep generated dependency files ignored even
 # when make places them below a per-directory .depend directory.
