@@ -3,22 +3,45 @@ name: release
 on:
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: write
+permissions: {}
 
 concurrency:
   group: release-${{ github.sha }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   GIT_TERMINAL_PROMPT: 0
+  REPOSITORY: ${{ github.repository }}
 
 jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+    steps:
+      - name: Refuse dispatches off the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          default_branch=$(gh api "repos/$REPOSITORY" --jq '.default_branch')
+          if [[ "$GITHUB_REF_TYPE" != "branch" || "$GITHUB_REF" != "refs/heads/$default_branch" ]]; then
+            echo "refusing $GITHUB_REF: releases only run from refs/heads/$default_branch" >&2
+            exit 1
+          fi
+
   build:
     name: Build (${{ matrix.name }})
+    needs: preflight
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
     defaults:
       run:
         shell: bash -euo pipefail {0}
@@ -29,71 +52,144 @@ jobs:
           - name: macos-aarch64
             runner: macos-26
             kind: macos
+            triple: aarch64-apple-darwin
           - name: linux-arm64
             runner: ubuntu-24.04-arm
             kind: linux
+            triple: aarch64-unknown-linux-musl
             docker_platform: linux/arm64
           - name: linux-amd64
             runner: ubuntu-latest
             kind: linux
+            triple: x86_64-unknown-linux-musl
             docker_platform: linux/amd64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Docker Buildx
         if: matrix.kind == 'linux'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Build macOS distribution
         if: matrix.kind == 'macos'
+        run: make macos
+
+      - name: Package macOS distribution
+        if: matrix.kind == 'macos'
         run: |
-          make macos
-          tar -czf "git-minimal-${{ matrix.name }}.tar.gz" \
-            -C dist/macos \
-            git git-shell git-upload-archive git-upload-pack git-receive-pack
+          sh scripts/package.sh dist/macos "${{ matrix.triple }}" out/
 
       - name: Build Linux distribution
         if: matrix.kind == 'linux'
         run: |
           make git \
             DOCKER_PLATFORM=${{ matrix.docker_platform }}
-          tar -czf "git-minimal-${{ matrix.name }}.tar.gz" \
-            -C dist \
-            git git-shell git-upload-archive git-upload-pack git-receive-pack
 
-      - uses: actions/upload-artifact@v4
+      - name: Package Linux distribution
+        if: matrix.kind == 'linux'
+        run: |
+          sh scripts/package.sh dist "${{ matrix.triple }}" out/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: git-minimal-${{ matrix.name }}
-          path: git-minimal-${{ matrix.name }}.tar.gz
+          name: git-${{ matrix.triple }}
+          path: |
+            out/git-${{ matrix.triple }}.zip
+            out/git-${{ matrix.triple }}.manifest
+          if-no-files-found: error
 
   release:
     name: Create pre-release
-    needs: build
+    needs: [preflight, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          pattern: git-minimal-*
+          pattern: git-*
           path: dist
           merge-multiple: true
 
-      - name: Checksum distributions
+      - name: Inventory release assets
         run: |
-          for archive in dist/git-minimal-*.tar.gz; do
-            name="${archive##*/}"
-            hash="$(sha256sum "$archive" | awk '{print $1}')"
-            printf '%s  %s\n' "$hash" "$name" > "dist/$name.sha256"
+          expected="git-aarch64-apple-darwin.manifest
+          git-aarch64-apple-darwin.zip
+          git-aarch64-unknown-linux-musl.manifest
+          git-aarch64-unknown-linux-musl.zip
+          git-x86_64-unknown-linux-musl.manifest
+          git-x86_64-unknown-linux-musl.zip"
+          actual="$(cd dist && ls git-*.zip git-*.manifest | sort)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "missing, duplicate, or extra release assets:" >&2
+            echo "$actual" >&2
+            exit 1
+          fi
+
+      - name: Verify Linux ELF artifacts are fully static
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          command -v readelf >/dev/null
+          X86_64_COUNT=0
+          AARCH64_COUNT=0
+          for binary in dist/**/*; do
+            [[ -f "$binary" ]] || continue
+            if ! readelf -h "$binary" >/dev/null 2>&1; then
+              continue
+            fi
+            machine=$(readelf -h "$binary" | sed -n 's/^[[:space:]]*Machine:[[:space:]]*//p')
+            case "$machine" in
+              "Advanced Micro Devices X86-64") X86_64_COUNT=$((X86_64_COUNT + 1)) ;;
+              AArch64) AARCH64_COUNT=$((AARCH64_COUNT + 1)) ;;
+              *) printf '%s has unsupported ELF machine %s\n' "$binary" "$machine" >&2; exit 1 ;;
+            esac
+            program_headers=$(readelf -lW "$binary")
+            if [[ "$program_headers" == *INTERP* ]]; then
+              printf '%s has a dynamic ELF interpreter\n' "$binary" >&2
+              exit 1
+            fi
+            dynamic_section=$(readelf -dW "$binary")
+            if [[ "$dynamic_section" == *NEEDED* ]]; then
+              printf '%s has a dynamic library dependency\n' "$binary" >&2
+              exit 1
+            fi
           done
+          if [[ "$X86_64_COUNT" -lt 1 || "$AARCH64_COUNT" -lt 1 ]]; then
+            printf 'Expected at least one x86_64 and one aarch64 Linux ELF artifact, found x86_64=%s aarch64=%s\n' "$X86_64_COUNT" "$AARCH64_COUNT" >&2
+            exit 1
+          fi
+
+      - name: Consolidate SHA256SUMS
+        run: |
+          (cd dist && sha256sum git-*.zip git-*.manifest | sort -k 2 > SHA256SUMS)
+          (cd dist && sha256sum -c SHA256SUMS)
+
+      - name: Create tag at the triggering commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: release-${{ github.sha }}
+        run: |
+          if gh api "repos/$REPOSITORY/git/matching-refs/tags/$RELEASE_TAG" --jq '.[].ref' | grep -q .; then
+            echo "tag $RELEASE_TAG already exists" >&2
+            exit 1
+          fi
+          gh api "repos/$REPOSITORY/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$GITHUB_SHA"
 
       - name: Create pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: release-${{ github.sha }}
         run: |
-          gh release create "$RELEASE_TAG" dist/git-minimal-* \
+          gh release create "$RELEASE_TAG" dist/git-*.zip dist/git-*.manifest dist/SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --prerelease \
+            --verify-tag \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_TAG"

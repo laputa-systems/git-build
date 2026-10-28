@@ -51,10 +51,12 @@ target, build commit, toolchain) and refresh the verified `SHA256SUMS` in
 before packaging.
 
 The manual GitHub Actions release workflow in `.github/workflows/release.yml`
-publishes prerelease tarballs for native `macos-26`, Linux arm64, and Linux
+publishes prerelease ZIPs for native `macos-26`, Linux arm64, and Linux
 amd64. The Linux jobs call `make git` with the checked-in Dockerfile and its
-static musl toolchain; the macOS job calls `make macos`. Each release also
-publishes a SHA-256 sidecar for its tarball.
+static musl toolchain; the macOS job calls `make macos`. Each job packages
+with `scripts/package.sh`; the release job inventories the six assets,
+consolidates the verified `SHA256SUMS`, and creates the prerelease.
+`sh scripts/audit-release.sh` asserts the workflow contract locally.
 
 `git-lfs` and `git-filter-repo` are separate projects rather than Git build
 features, so they are intentionally absent. `git-cvsserver` is omitted by the
