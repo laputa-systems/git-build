@@ -35,13 +35,17 @@ RUN case "$(apk --print-arch)" in \
 
 WORKDIR /src
 
+ARG GIT_VERSION
+ARG GIT_ARCHIVE_SHA256
+RUN test -n "$GIT_VERSION" && test -n "$GIT_ARCHIVE_SHA256"
+
 # BuildKit fetches and unpacks the official release archive. Its SHA-256 keeps
 # the source immutable without putting a downloader or CA bundle in the image.
-ADD --checksum=sha256:26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3 \
+ADD --checksum=sha256:${GIT_ARCHIVE_SHA256} \
     --unpack=true \
-    https://www.kernel.org/pub/software/scm/git/git-2.56.0.tar.xz /src/
+    https://www.kernel.org/pub/software/scm/git/git-${GIT_VERSION}.tar.xz /src/
 
-WORKDIR /src/git-2.56.0
+WORKDIR /src/git-${GIT_VERSION}
 
 # musl does not expose REG_STARTEND; use Git's compatibility regex.
 RUN set -eux; \
@@ -88,6 +92,9 @@ RUN set -eux; \
     done
 
 FROM alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS runtime-test
+
+ARG GIT_VERSION
+ENV GIT_EXPECTED_VERSION=${GIT_VERSION}
 
 COPY --from=build /out/ /usr/local/bin/
 COPY --chmod=755 test/runtime.sh /usr/local/bin/git-minimal-runtime-test

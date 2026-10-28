@@ -4,9 +4,16 @@ set -eu
 bin_dir=${GIT_BIN_DIR:-/usr/local/bin}
 git="$bin_dir/git"
 expected_exec_path=${GIT_EXPECTED_EXEC_PATH:-$bin_dir}
+if [ -n "${GIT_EXPECTED_VERSION:-}" ]; then
+    expected_version=$GIT_EXPECTED_VERSION
+else
+    script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+    expected_version=$(sed -n 's/^version=//p' "$script_dir/../scripts/download-git-source.sh")
+fi
 
 test -x "$git"
-test "$("$git" --version)" = "git version 2.56.0"
+test -n "$expected_version"
+test "$("$git" --version)" = "git version $expected_version"
 test "$("$git" --exec-path)" = "$expected_exec_path"
 
 check_linkage() {

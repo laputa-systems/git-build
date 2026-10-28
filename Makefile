@@ -2,7 +2,8 @@ DOCKER_BUILD ?= docker buildx build
 DOCKER_BUILD_CACHE_ARGS ?=
 DOCKER_PLATFORM ?= linux/arm64
 
-GIT_VERSION ?= 2.56.0
+GIT_VERSION ?= $(shell sed -n 's/^version=//p' scripts/download-git-source.sh)
+GIT_ARCHIVE_SHA256 ?= $(shell sed -n 's/^archive_sha256=//p' scripts/download-git-source.sh)
 GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
 
 MACOS_DIST ?= dist/macos
@@ -18,6 +19,8 @@ git:
 		$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) \
 			--platform=$(DOCKER_PLATFORM) \
 			--progress=plain \
+			--build-arg=GIT_VERSION=$(GIT_VERSION) \
+			--build-arg=GIT_ARCHIVE_SHA256=$(GIT_ARCHIVE_SHA256) \
 			--target=artifacts \
 			--output=type=local,dest=dist \
 			.; \
@@ -87,5 +90,6 @@ macos:
 		expected_exec_path="$$("$(MACOS_DIST)/git" --exec-path)"; \
 		GIT_BIN_DIR="$(abspath $(MACOS_DIST))" \
 		GIT_EXPECTED_EXEC_PATH="$$expected_exec_path" \
+		GIT_EXPECTED_VERSION="$(GIT_VERSION)" \
 			sh test/runtime.sh; \
 		echo "Wrote $(MACOS_DIST)/git and $(MACOS_DIST)/git-*"

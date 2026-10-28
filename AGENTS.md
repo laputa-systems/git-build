@@ -11,7 +11,8 @@ Git's Darwin filename normalization requires it.
 
 The Linux Docker build fetches and unpacks the Git source archive with
 BuildKit's `ADD` instruction and a pinned SHA-256; it needs no downloader, CA
-bundle, or runtime image.
+bundle, or runtime image. `Makefile` passes the version and SHA to the Docker
+build from the canonical script.
 
 ```sh
 make git
@@ -28,6 +29,14 @@ pinned Git source archive into the checked-in `src/` subtree. The script keeps
 the generated command and hook metadata needed after Documentation is removed.
 After that, `make macos` builds without Docker, Homebrew, or a separate
 compiler toolchain.
+
+The canonical Git version is `version=` in `scripts/download-git-source.sh`
+(with `archive_sha256=` beside it). `Makefile`, `Dockerfile`, and
+`test/runtime.sh` derive from it; do not hardcode the version elsewhere.
+
+To upgrade Git, update `version=` and `archive_sha256=` in
+`scripts/download-git-source.sh`, run it to refresh `src/`, then verify with
+`make macos` and `make git`.
 
 The Dockerfile runs `test/runtime.sh` in a clean Alpine stage before exporting
 the artifacts. The harness checks static linking, runtime-prefix relocation,
