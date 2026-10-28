@@ -132,6 +132,17 @@ jobs:
             exit 1
           fi
 
+      - name: Stage Linux ELF artifacts
+        run: |
+          rm -rf stage
+          mkdir -p stage
+          for archive in dist/git-*.zip; do
+            triple=${archive#dist/git-}
+            triple=${triple%.zip}
+            mkdir -p "stage/$triple"
+            unzip -q "$archive" -d "stage/$triple"
+          done
+
       - name: Verify Linux ELF artifacts are fully static
         run: |
           set -euo pipefail
@@ -139,7 +150,7 @@ jobs:
           command -v readelf >/dev/null
           X86_64_COUNT=0
           AARCH64_COUNT=0
-          for binary in dist/**/*; do
+          for binary in stage/**/*; do
             [[ -f "$binary" ]] || continue
             if ! readelf -h "$binary" >/dev/null 2>&1; then
               continue
