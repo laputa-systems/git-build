@@ -10,7 +10,15 @@ MACOS_DIST ?= dist/macos
 MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections -fstack-protector-strong
 MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 
-.PHONY: git macos
+.PHONY: git lint macos
+
+lint:
+	sh -n scripts/audit-release.sh
+	sh -n scripts/download-git-source.sh
+	sh -n scripts/package.sh
+	sh -n scripts/qualify-binaries.sh
+	sh -n test/runtime.sh
+	sh scripts/audit-release.sh
 
 git:
 	@set -eu; \
