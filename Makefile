@@ -1,67 +1,21 @@
 DOCKER_BUILD ?= docker buildx build
 DOCKER_BUILD_CACHE_ARGS ?=
+DOCKER_PLATFORM ?= linux/arm64
 
 GIT_VERSION ?= 2.55.0
 GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
-HOST_ARCH := $(shell uname -m)
-ifeq ($(filter arm64 aarch64,$(HOST_ARCH)),)
-DIFF_PRETTY_LINUX_TARGET ?= x86_64-unknown-linux-musl
-else
-DIFF_PRETTY_LINUX_TARGET ?= aarch64-unknown-linux-musl
-endif
-ifeq ($(DIFF_PRETTY_LINUX_TARGET),aarch64-unknown-linux-musl)
-DOCKER_PLATFORM ?= linux/arm64
-else ifeq ($(DIFF_PRETTY_LINUX_TARGET),x86_64-unknown-linux-musl)
-DOCKER_PLATFORM ?= linux/amd64
-else
-$(error unsupported DIFF_PRETTY_LINUX_TARGET: $(DIFF_PRETTY_LINUX_TARGET) (use aarch64-unknown-linux-musl or x86_64-unknown-linux-musl))
-endif
-ifeq ($(shell uname -m),x86_64)
-DIFF_PRETTY_MAC_TARGET ?= x86_64-apple-darwin
-else
-DIFF_PRETTY_MAC_TARGET ?= aarch64-apple-darwin
-endif
-DIFF_PRETTY_FFI_ROOT ?= $(CURDIR)/.cache/diff-pretty/ffi
-DIFF_PRETTY_LOCAL_ROOT ?= $(CURDIR)/../diff-pretty
-CARGO ?= cargo
 
 MACOS_DIST ?= dist/macos
 MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections
 MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 
-.PHONY: git macos macos-local
-
-macos-local:
-	@set -eu; \
-		ffi_repo="$(abspath $(DIFF_PRETTY_LOCAL_ROOT))"; \
-		target="$(DIFF_PRETTY_MAC_TARGET)"; \
-		test -f "$$ffi_repo/Cargo.toml" || { echo "missing local diff-pretty checkout: $$ffi_repo" >&2; exit 1; }; \
-		"$(CARGO)" build --manifest-path "$$ffi_repo/Cargo.toml" --release --package diff-pretty-ffi --target "$$target" --locked; \
-		ffi_lib="$$ffi_repo/target/$$target/release/libdiff_pretty_ffi.a"; \
-		ffi_include="$$ffi_repo/ffi/include"; \
-		test -s "$$ffi_lib" || { echo "missing local diff-pretty FFI library: $$ffi_lib" >&2; exit 1; }; \
-		test -s "$$ffi_include/diff_pretty.h" || { echo "missing local diff-pretty FFI header: $$ffi_include/diff_pretty.h" >&2; exit 1; }; \
-		staging_root="$$(mktemp -d "$${TMPDIR:-/tmp}/diff-pretty-ffi-local.XXXXXX")"; \
-		trap 'rm -rf "$$staging_root"' EXIT HUP INT TERM; \
-		mkdir -p "$$staging_root/$$target/lib"; \
-		ln -s "$$ffi_include" "$$staging_root/$$target/include"; \
-		ln -s "$$ffi_lib" "$$staging_root/$$target/lib/libdiff_pretty_ffi.a"; \
-		printf 'format=diff-pretty-ffi-v1\ntarget=%s\n' "$$target" > "$$staging_root/$$target/manifest"; \
-		$(MAKE) macos DIFF_PRETTY_MAC_TARGET="$$target" DIFF_PRETTY_FFI_ROOT="$$staging_root"
+.PHONY: git macos
 
 git:
 	@set -eu; \
-		sh scripts/download-diff-pretty-ffi.sh "$(DIFF_PRETTY_LINUX_TARGET)" "$(abspath $(DIFF_PRETTY_FFI_ROOT))"; \
-		ffi_root="$(abspath $(DIFF_PRETTY_FFI_ROOT)/$(DIFF_PRETTY_LINUX_TARGET))"; \
-		ffi_include="$$ffi_root/include"; \
-		ffi_lib="$$ffi_root/lib/libdiff_pretty_ffi.a"; \
-		test -f "$$ffi_include/diff_pretty.h" || { echo "missing prebuilt diff-pretty header: $$ffi_include/diff_pretty.h" >&2; exit 1; }; \
-		test -f "$$ffi_lib" || { echo "missing prebuilt diff-pretty static library: $$ffi_lib" >&2; exit 1; }; \
 		mkdir -p dist; \
 		rm -f dist/git dist/git-shell dist/git-upload-archive dist/git-upload-pack dist/git-receive-pack; \
 		$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) \
-			--build-context diff-pretty="$$ffi_root" \
-			--build-context diff-pretty-lib="$$ffi_root/lib" \
 			--platform=$(DOCKER_PLATFORM) \
 			--progress=plain \
 			--target=artifacts \
@@ -78,12 +32,6 @@ git:
 
 macos:
 	@set -eu; \
-		sh scripts/download-diff-pretty-ffi.sh "$(DIFF_PRETTY_MAC_TARGET)" "$(abspath $(DIFF_PRETTY_FFI_ROOT))"; \
-		ffi_root="$(abspath $(DIFF_PRETTY_FFI_ROOT)/$(DIFF_PRETTY_MAC_TARGET))"; \
-		ffi_include="$$ffi_root/include"; \
-		ffi_lib="$$ffi_root/lib/libdiff_pretty_ffi.a"; \
-		test -f "$$ffi_include/diff_pretty.h" || { echo "missing prebuilt diff-pretty header: $$ffi_include/diff_pretty.h" >&2; exit 1; }; \
-		test -f "$$ffi_lib" || { echo "missing prebuilt diff-pretty static library: $$ffi_lib" >&2; exit 1; }; \
 		test "$$(uname -s)" = Darwin; \
 		test -f "$(GIT_SOURCE_DIR)/Makefile" || { \
 			echo "run ./scripts/download-git-source.sh first" >&2; \
@@ -100,7 +48,7 @@ macos:
 			AR="$$ar" \
 			RANLIB="$$ranlib" \
 			STRIP="$$strip" \
-			CPPFLAGS="-isysroot $$sdkroot -DDIFF_PRETTY_ENABLED -I$$ffi_include" \
+			CPPFLAGS="-isysroot $$sdkroot" \
 			CFLAGS="$(MACOS_CFLAGS)" \
 			LDFLAGS="$(MACOS_LDFLAGS) -isysroot $$sdkroot" \
 			NO_CURL=YesPlease \
@@ -114,8 +62,6 @@ macos:
 			NO_PYTHON=YesPlease \
 			NO_REGEX=NeedsStartEnd \
 			NO_RUST=YesPlease \
-			DIFF_PRETTY_FFI_LIB="$$ffi_lib" \
-			DIFF_PRETTY_FFI_INCLUDE="$$ffi_include" \
 			NO_TCLTK=YesPlease \
 			RUNTIME_PREFIX=YesPlease \
 			prefix=/usr \
@@ -143,4 +89,3 @@ macos:
 		GIT_EXPECTED_EXEC_PATH="$$expected_exec_path" \
 			sh test/runtime.sh; \
 		echo "Wrote $(MACOS_DIST)/git and $(MACOS_DIST)/git-*"
-

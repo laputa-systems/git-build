@@ -52,10 +52,6 @@
 #include "userdiff.h"
 #include "write-or-die.h"
 
-#ifdef DIFF_PRETTY_ENABLED
-#include "diff-pretty-integration.h"
-#endif
-
 #define MAIL_DEFAULT_WRAP 72
 #define COVER_FROM_AUTO_MAX_SUBJECT_LEN 100
 #define FORMAT_PATCH_NAME_MAX_DEFAULT 64
@@ -400,39 +396,7 @@ static void cmd_log_init(int argc, const char **argv, const char *prefix,
 	cmd_log_init_finish(argc, argv, prefix, rev, opt, cfg);
 }
 
-#ifdef DIFF_PRETTY_ENABLED
-static void setup_native_log_pager(void)
-{
-	int native;
-
-	native = diff_pretty_setup_log(the_repository);
-	if (native < 0)
-		die(_("unable to initialize builtin:diff-pretty"));
-}
-
-static void setup_native_show_pager(const struct rev_info *rev)
-{
-	unsigned int i;
-
-	if (!(rev->diffopt.output_format & DIFF_FORMAT_PATCH) ||
-	    !rev->pending.nr)
-		return;
-	for (i = 0; i < rev->pending.nr; i++)
-		if (rev->pending.objects[i].item->type != OBJ_COMMIT)
-			return;
-	setup_native_log_pager();
-}
-#endif
-
-static void finish_native_log_pager(void)
-{
-#ifdef DIFF_PRETTY_ENABLED
-	if (diff_pretty_active() && diff_pretty_end() < 0)
-		die(_("builtin:diff-pretty pager failed"));
-#endif
-}
-
-static int cmd_log_walk_no_free(struct rev_info *rev, int start_native_pager)
+static int cmd_log_walk_no_free(struct rev_info *rev)
 {
 	struct commit *commit;
 	int saved_nrl = 0;
@@ -441,18 +405,13 @@ static int cmd_log_walk_no_free(struct rev_info *rev, int start_native_pager)
 
 	if (prepare_revision_walk(rev))
 		die(_("revision walk setup failed"));
-	commit = get_revision(rev);
-#ifdef DIFF_PRETTY_ENABLED
-	if (start_native_pager && commit)
-		setup_native_log_pager();
-#endif
 
 	/*
 	 * For --check and --exit-code, the exit code is based on CHECK_FAILED
 	 * and HAS_CHANGES being accumulated in rev->diffopt, so be careful to
 	 * retain that state information if replacing rev->diffopt in this loop
 	 */
-	while (commit != NULL) {
+	while ((commit = get_revision(rev)) != NULL) {
 		if (!log_tree_commit(rev, commit) && rev->max_count >= 0)
 			/*
 			 * We decremented max_count in get_revision,
@@ -473,15 +432,10 @@ static int cmd_log_walk_no_free(struct rev_info *rev, int start_native_pager)
 			commit_list_free(commit->parents);
 			commit->parents = NULL;
 		}
-#ifdef DIFF_PRETTY_ENABLED
-		if (diff_pretty_quit())
-			break;
-#endif
 		if (saved_nrl < rev->diffopt.needed_rename_limit)
 			saved_nrl = rev->diffopt.needed_rename_limit;
 		if (rev->diffopt.degraded_cc_to_c)
 			saved_dcctc = 1;
-		commit = get_revision(rev);
 	}
 	rev->diffopt.degraded_cc_to_c = saved_dcctc;
 	rev->diffopt.needed_rename_limit = saved_nrl;
@@ -494,12 +448,12 @@ static int cmd_log_walk_no_free(struct rev_info *rev, int start_native_pager)
 	return result;
 }
 
-static int cmd_log_walk(struct rev_info *rev, int start_native_pager)
+static int cmd_log_walk(struct rev_info *rev)
 {
 	int retval;
 
 	rev->diffopt.no_free = 1;
-	retval = cmd_log_walk_no_free(rev, start_native_pager);
+	retval = cmd_log_walk_no_free(rev);
 	rev->diffopt.no_free = 0;
 	diff_free(&rev->diffopt);
 	return retval;
@@ -605,7 +559,7 @@ int cmd_whatchanged(int argc,
 	if (!rev.diffopt.output_format)
 		rev.diffopt.output_format = DIFF_FORMAT_RAW;
 
-	ret = cmd_log_walk(&rev, 0);
+	ret = cmd_log_walk(&rev);
 
 	release_revisions(&rev);
 	log_config_release(&cfg);
@@ -739,13 +693,8 @@ int cmd_show(int argc,
 	opt.tweak = show_setup_revisions_tweak;
 	cmd_log_init(argc, argv, prefix, &rev, &opt, &cfg);
 
-#ifdef DIFF_PRETTY_ENABLED
-	setup_native_show_pager(&rev);
-#endif
-
 	if (!rev.no_walk) {
-		ret = cmd_log_walk(&rev, 0);
-		finish_native_log_pager();
+		ret = cmd_log_walk(&rev);
 		release_revisions(&rev);
 		log_config_release(&cfg);
 		return ret;
@@ -802,7 +751,7 @@ int cmd_show(int argc,
 			memcpy(&rev.pending, &blank, sizeof(rev.pending));
 
 			add_object_array(o, name, &rev.pending);
-			ret = cmd_log_walk_no_free(&rev, 0);
+			ret = cmd_log_walk_no_free(&rev);
 
 			/*
 			 * No need for
@@ -819,7 +768,6 @@ int cmd_show(int argc,
 
 	rev.diffopt.no_free = 0;
 	diff_free(&rev.diffopt);
-	finish_native_log_pager();
 	release_revisions(&rev);
 	log_config_release(&cfg);
 
@@ -857,7 +805,7 @@ int cmd_log_reflog(int argc,
 	rev.always_show_header = 1;
 	cmd_log_init_finish(argc, argv, prefix, &rev, &opt, &cfg);
 
-	ret = cmd_log_walk(&rev, 0);
+	ret = cmd_log_walk(&rev);
 
 	release_revisions(&rev);
 	log_config_release(&cfg);
@@ -898,8 +846,7 @@ int cmd_log(int argc,
 	opt.tweak = log_setup_revisions_tweak;
 	cmd_log_init(argc, argv, prefix, &rev, &opt, &cfg);
 
-	ret = cmd_log_walk(&rev, 1);
-	finish_native_log_pager();
+	ret = cmd_log_walk(&rev);
 
 	release_revisions(&rev);
 	log_config_release(&cfg);
