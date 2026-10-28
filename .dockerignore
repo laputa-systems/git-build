@@ -3,3 +3,5 @@
 !Dockerfile
 !test/
 !test/runtime.sh
+!scripts/
+!scripts/qualify-binaries.sh

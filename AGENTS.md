@@ -12,7 +12,7 @@ Git's Darwin filename normalization requires it.
 The Linux Docker build fetches and unpacks the Git source archive with
 BuildKit's `ADD` instruction and a pinned SHA-256; it needs no downloader, CA
 bundle, or runtime image. `Makefile` passes the version and SHA to the Docker
-build from the canonical script.
+build from the canonical script. Linux binaries are hardened static PIE.
 
 ```sh
 make git

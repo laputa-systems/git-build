@@ -10,14 +10,15 @@ ARG LLVM_VERSION=22.1.3
 # Alpine's Clang driver still uses GCC's musl crtbegin/libgcc files for a
 # static link; clang remains the compiler selected below.
 RUN apk add --no-cache \
+        binutils=2.45.1-r1 \
         clang22=22.1.3-r2 \
         gcc=15.2.0-r5 \
         lld22=22.1.3-r0 \
-        llvm22=22.1.3-r0 \
+        llvm22=22.1.3-r1 \
         linux-headers=7.0.0-r1 \
         make=4.4.1-r4 \
-        zlib-dev=1.3.2-r0 \
-        zlib-static=1.3.2-r0
+        zlib-dev=1.3.2-r1 \
+        zlib-static=1.3.2-r1
 
 ENV PATH=/usr/lib/llvm22/bin:$PATH \
     CC=clang \
@@ -55,8 +56,8 @@ RUN set -eux; \
         RANLIB="$RANLIB" \
         LD="$LD" \
         STRIP="$STRIP" \
-        CFLAGS="-O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections" \
-        LDFLAGS="-static -flto -fuse-ld=lld -Wl,--gc-sections" \
+        CFLAGS="-O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections -fstack-protector-strong" \
+        LDFLAGS="-static-pie -flto -fuse-ld=lld -Wl,--gc-sections" \
         NO_CURL=YesPlease \
         NO_EXPAT=YesPlease \
         NO_GETTEXT=YesPlease \
@@ -90,6 +91,11 @@ RUN set -eux; \
     for helper in git git-shell; do \
         test -z "$(ldd "$helper" 2>&1 | grep -F '=>' || true)"; \
     done
+
+COPY scripts/qualify-binaries.sh /tmp/qualify-binaries.sh
+
+RUN sh /tmp/qualify-binaries.sh /out \
+    && rm /tmp/qualify-binaries.sh
 
 FROM alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS runtime-test
 

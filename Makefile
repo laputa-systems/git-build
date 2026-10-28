@@ -7,7 +7,7 @@ GIT_ARCHIVE_SHA256 ?= $(shell sed -n 's/^archive_sha256=//p' scripts/download-gi
 GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
 
 MACOS_DIST ?= dist/macos
-MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections
+MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections -fstack-protector-strong
 MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 
 .PHONY: git macos
@@ -91,5 +91,6 @@ macos:
 		GIT_BIN_DIR="$(abspath $(MACOS_DIST))" \
 		GIT_EXPECTED_EXEC_PATH="$$expected_exec_path" \
 		GIT_EXPECTED_VERSION="$(GIT_VERSION)" \
+		GIT_QUALIFY_SCRIPT="$(abspath scripts/qualify-binaries.sh)" \
 			sh test/runtime.sh; \
 		echo "Wrote $(MACOS_DIST)/git and $(MACOS_DIST)/git-*"

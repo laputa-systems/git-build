@@ -47,6 +47,10 @@ test ! -e "$bin_dir/git-filter-repo"
 test ! -e "$bin_dir/git-remote-http"
 test ! -e "$bin_dir/git-remote-https"
 
+if [ -n "${GIT_QUALIFY_SCRIPT:-}" ]; then
+    sh "$GIT_QUALIFY_SCRIPT" "$bin_dir"
+fi
+
 test_home=$(mktemp -d)
 trap 'rm -rf "$test_home"' EXIT HUP INT TERM
 export HOME="$test_home"
