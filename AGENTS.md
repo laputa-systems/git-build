@@ -1,63 +1,30 @@
 # git-minimal-musl-static
 
-Builds a small, production-optimized Git distribution for Linux/aarch64,
-Linux/amd64, and native macOS. The Linux build is static and uses Alpine's
-LLVM 22 toolchain;
-the macOS build uses Apple's system Clang and system libraries. Both keep Git's
-built-in commands and native transports such as SSH, but omit HTTPS/cURL,
-Expat, gettext, Perl, Python, Tcl/Tk, Gitweb, and Rust.
-The Linux build also omits iconv; native macOS iconv remains enabled because
-Git's Darwin filename normalization requires it.
-
-The Linux Docker build fetches and unpacks the Git source archive with
-BuildKit's `ADD` instruction and a pinned SHA-256; it needs no downloader, CA
-bundle, or runtime image. `Makefile` passes the version and SHA to the Docker
-build from the canonical script. Linux binaries are hardened static PIE.
+Minimal Git for macOS arm64 and static Linux musl. Linux uses Alpine's LLVM 22
+toolchain and ships hardened static PIE; macOS uses system Clang and keeps
+iconv for filename normalization. Both omit HTTPS/cURL, Expat, gettext, Perl,
+Python, Tcl/Tk, Gitweb, and Rust.
 
 ```sh
-make git
-make macos
+make macos                        # dist/macos/
+make git                          # dist/, DOCKER_PLATFORM=linux/arm64|amd64
+make lint                         # shell syntax plus release audit
+sh scripts/qualify-binaries.sh dist/macos
+sh scripts/package.sh dist/macos aarch64-apple-darwin out/
+sh test/runtime.sh                # needs GIT_BIN_DIR pointing at binaries
 ```
 
-`make git` writes `dist/git` plus `git-shell` and the three server helper
-symlinks. `make macos` writes the corresponding files under `dist/macos/`.
-The three built-in server helpers are relative symlinks to `git`; `git-shell`
-is a separate executable. Install the files together in one `bin` directory.
-
-Run `./scripts/download-git-source.sh` to download, verify, and trim the same
-pinned Git source archive into the checked-in `src/` subtree. The script keeps
-the generated command and hook metadata needed after Documentation is removed.
-After that, `make macos` builds without Docker, Homebrew, or a separate
-compiler toolchain.
-
-The canonical Git version is `version=` in `scripts/download-git-source.sh`
-(with `archive_sha256=` beside it). `Makefile`, `Dockerfile`, and
-`test/runtime.sh` derive from it; do not hardcode the version elsewhere.
+Invariants: `version=` in `scripts/download-git-source.sh` is the only
+version string — `Makefile`, `Dockerfile`, and `test/runtime.sh` derive from
+it. Every target ships the same five files: `git`, `git-shell`, and three
+relative helper symlinks to `git`. HTTPS remotes must fail naming the missing
+remote helper.
 
 To upgrade Git, update `version=` and `archive_sha256=` in
 `scripts/download-git-source.sh`, run it to refresh `src/`, then verify with
 `make macos` and `make git`.
 
-The Dockerfile runs `test/runtime.sh` in a clean Alpine stage before exporting
-the artifacts. The harness checks static linking, runtime-prefix relocation,
-configuration, repository operations, maintenance commands, helper layout,
-and omitted features. It also asserts that HTTPS remotes fail naming the
-missing remote helper.
-
-Run `sh scripts/package.sh <bin_dir> <triple> <out_dir>` to write
-`git-<triple>.zip` plus a build manifest (upstream version, archive SHA-256,
-target, build commit, toolchain) and refresh the verified `SHA256SUMS` in
-`out_dir`. `sh scripts/qualify-binaries.sh <bin_dir>` qualifies final bytes
-before packaging.
-
-The manual GitHub Actions release workflow in `.github/workflows/release.yml`
-publishes prerelease ZIPs for native `macos-26`, Linux arm64, and Linux
-amd64. The Linux jobs call `make git` with the checked-in Dockerfile and its
-static musl toolchain; the macOS job calls `make macos`. Each job packages
-with `scripts/package.sh`; the release job inventories the six assets,
-consolidates the verified `SHA256SUMS`, and creates the prerelease.
-`sh scripts/audit-release.sh` asserts the workflow contract locally.
-
-`git-lfs` and `git-filter-repo` are separate projects rather than Git build
-features, so they are intentionally absent. `git-cvsserver` is omitted by the
-`NO_PERL` build.
+Releases come from `.github/workflows/release.yml` (manual dispatch, three
+matrix triples, verified `SHA256SUMS`); `sh scripts/audit-release.sh` checks
+the workflow contract. The build manifest format lives in
+`scripts/package.sh`.
