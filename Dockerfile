@@ -3,7 +3,7 @@
 # alpine:latest currently resolves to Alpine 3.24.1. Keep the resolved digest
 # here so the base image is still the requested latest line without moving the
 # build when the tag moves.
-FROM alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS build
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS build
 
 ARG LLVM_VERSION=22.1.3
 
@@ -97,7 +97,7 @@ COPY scripts/qualify-binaries.sh /tmp/qualify-binaries.sh
 RUN sh /tmp/qualify-binaries.sh /out \
     && rm /tmp/qualify-binaries.sh
 
-FROM alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b AS runtime-test
+FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime-test
 
 ARG GIT_VERSION
 ENV GIT_EXPECTED_VERSION=${GIT_VERSION}
