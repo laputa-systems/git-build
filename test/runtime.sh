@@ -44,13 +44,20 @@ check_linkage() {
 
 check_linkage "$git"
 check_linkage "$bin_dir/git-shell"
+check_linkage "$bin_dir/git-sh-i18n--envsubst"
 
 test -x "$bin_dir/git-shell"
 test ! -L "$bin_dir/git-shell"
-for helper in git-upload-archive git-upload-pack git-receive-pack; do
+for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do
     test -x "$bin_dir/$helper"
     test -L "$bin_dir/$helper"
 done
+test -x "$bin_dir/git-submodule"
+test ! -L "$bin_dir/git-submodule"
+test -s "$bin_dir/git-sh-setup"
+test -s "$bin_dir/git-sh-i18n"
+test -x "$bin_dir/git-sh-i18n--envsubst"
+test ! -L "$bin_dir/git-sh-i18n--envsubst"
 
 test ! -e "$bin_dir/git-cvsserver"
 test ! -e "$bin_dir/git-lfs"
@@ -67,6 +74,10 @@ trap 'rm -rf "$test_home"' EXIT HUP INT TERM
 export HOME="$test_home"
 export XDG_CONFIG_HOME="$test_home/.config"
 export PATH="$bin_dir:$PATH"
+# Runtime prefix only relocates when git lives in a `bin`-named directory
+# (production unpacks into ~/.local/bin). Here the bundle is in an arbitrary
+# dist dir, so point exec-path at it to exercise the submodule script.
+export GIT_EXEC_PATH="$bin_dir"
 mkdir -p "$XDG_CONFIG_HOME/git"
 : > "$XDG_CONFIG_HOME/git/config"
 
@@ -180,6 +191,45 @@ test "$(git rev-list --merges --count HEAD)" = 1
 test "$(cat file.txt)" = "$(printf 'one\ntwo\nfour')"
 test "$(cat side.txt)" = "$(printf 'three\nfive')"
 git push -q origin work
+test -z "$(git status --short)"
+
+# Submodules require the git-submodule script, its sh-setup/sh-i18n libs,
+# and the submodule--helper builtin. Exercise the exact failure seen from
+# npm (submodule update --init) end to end.
+child="$test_home/child"
+git init -q --template= "$child"
+cd "$child"
+printf '%s\n' child > child.txt
+git add child.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm child
+super="$test_home/super"
+git init -q --template= "$super"
+cd "$super"
+printf '%s\n' super > super.txt
+git add super.txt
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm super
+git -c protocol.file.allow=always submodule add -q "$child" child
+GIT_AUTHOR_NAME=Joshua \
+GIT_AUTHOR_EMAIL=joshua@example.com \
+GIT_COMMITTER_NAME=Joshua \
+GIT_COMMITTER_EMAIL=joshua@example.com \
+    git commit -qm add-submodule
+test -f child/child.txt
+git submodule status -- child | grep -q child
+git clone -q --template= "$super" "$test_home/super-clone"
+cd "$test_home/super-clone"
+git -c protocol.file.allow=always submodule update --init -q
+test -f child/child.txt
+test "$(git submodule status -- child | awk '{print $2}')" = child
+git submodule update --init -q
 test -z "$(git status --short)"
 cd "$repo"
 test -z "$(git status --short)"

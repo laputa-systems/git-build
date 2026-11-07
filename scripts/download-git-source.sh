@@ -123,15 +123,22 @@ rm -f \
     "$staged_dir/http.c" \
     "$staged_dir/imap-send.c" \
     "$staged_dir/remote-curl.c" \
-    "$staged_dir/scalar.c" \
-    "$staged_dir/sh-i18n--envsubst.c"
+    "$staged_dir/scalar.c"
 
 for file in \
     "$staged_dir"/git-*.perl \
     "$staged_dir"/git-*.py \
     "$staged_dir"/git-*.sh; do
     test -e "$file" || continue
-    rm -f "$file"
+    case "$file" in
+    "$staged_dir"/git-submodule.sh|\
+    "$staged_dir"/git-sh-setup.sh|\
+    "$staged_dir"/git-sh-i18n.sh)
+        ;;
+    *)
+        rm -f "$file"
+        ;;
+    esac
 done
 
 rm -rf "$source_dir"

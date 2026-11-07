@@ -68,7 +68,8 @@ manifest_name="git-$triple.manifest"
 rm -f "$out_dir/$zip_name" "$out_dir/$manifest_name"
 
 (cd "$bin_dir" && zip -y -X -q "$out_dir/$zip_name" \
-    git git-shell git-upload-archive git-upload-pack git-receive-pack)
+    git git-shell git-upload-archive git-upload-pack git-receive-pack \
+    git-submodule git-submodule--helper git-sh-setup git-sh-i18n git-sh-i18n--envsubst)
 
 cat > "$out_dir/$manifest_name" <<EOF
 upstream_version=$upstream_version

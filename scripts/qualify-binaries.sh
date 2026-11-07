@@ -31,12 +31,21 @@ test -x "$shell" || fail "$shell is not executable"
 test ! -L "$git" || fail "$git must not be a symlink"
 test ! -L "$shell" || fail "git-shell must be a separate executable, not a symlink"
 
-for helper in git-upload-archive git-upload-pack git-receive-pack; do
+for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do
     test -x "$bin_dir/$helper" || fail "$bin_dir/$helper is missing"
     test -L "$bin_dir/$helper" || fail "$bin_dir/$helper must be a symlink to git"
     target=$(readlink "$bin_dir/$helper")
     test "$target" = "git" || fail "$bin_dir/$helper links to $target, want git"
 done
+
+test -x "$bin_dir/git-submodule" || fail "$bin_dir/git-submodule is missing"
+test ! -L "$bin_dir/git-submodule" || fail "git-submodule must be a file, not a symlink"
+for lib in git-sh-setup git-sh-i18n; do
+    test -s "$bin_dir/$lib" || fail "$bin_dir/$lib is missing"
+    test ! -L "$bin_dir/$lib" || fail "$lib must be a file, not a symlink"
+done
+test -x "$bin_dir/git-sh-i18n--envsubst" || fail "$bin_dir/git-sh-i18n--envsubst is missing"
+test ! -L "$bin_dir/git-sh-i18n--envsubst" || fail "git-sh-i18n--envsubst must be a separate executable, not a symlink"
 
 for omitted in git-cvsserver git-lfs git-filter-repo git-remote-http git-remote-https; do
     test ! -e "$bin_dir/$omitted" || fail "$bin_dir/$omitted must be absent"

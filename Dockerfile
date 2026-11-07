@@ -77,14 +77,25 @@ RUN set -eux; \
         git-upload-archive \
         git-shell \
         git-upload-pack \
-        git-receive-pack; \
+        git-receive-pack \
+        git-submodule \
+        git-submodule--helper \
+        git-sh-setup \
+        git-sh-i18n \
+        git-sh-i18n--envsubst; \
     ./git --version; \
-    llvm22-strip --strip-unneeded git git-shell; \
+    llvm22-strip --strip-unneeded git git-shell git-sh-i18n--envsubst; \
     mkdir /out; \
     test -x git; \
     test -x git-shell; \
-    cp -a git git-shell /out/; \
-    for helper in git-upload-archive git-upload-pack git-receive-pack; do \
+    test -x git-submodule; \
+    test -x git-submodule--helper; \
+    test -s git-sh-setup; \
+    test -s git-sh-i18n; \
+    test -x git-sh-i18n--envsubst; \
+    cp -a git git-shell git-submodule git-sh-setup git-sh-i18n git-sh-i18n--envsubst /out/; \
+    chmod 644 /out/git-sh-setup /out/git-sh-i18n; \
+    for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do \
         test -x "$helper"; \
         ln -s git "/out/$helper"; \
     done; \

@@ -23,7 +23,7 @@ lint:
 git:
 	@set -eu; \
 		mkdir -p dist; \
-		rm -f dist/git dist/git-shell dist/git-upload-archive dist/git-upload-pack dist/git-receive-pack; \
+		rm -f dist/git dist/git-shell dist/git-upload-archive dist/git-upload-pack dist/git-receive-pack dist/git-submodule dist/git-submodule--helper dist/git-sh-setup dist/git-sh-i18n dist/git-sh-i18n--envsubst; \
 		$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) \
 			--platform=$(DOCKER_PLATFORM) \
 			--progress=plain \
@@ -36,6 +36,11 @@ git:
 		for helper in git-upload-archive git-shell git-upload-pack git-receive-pack; do \
 			test -x "dist/$$helper"; \
 		done; \
+		test -x dist/git-submodule; \
+		test -x dist/git-submodule--helper; \
+		test -s dist/git-sh-setup; \
+		test -s dist/git-sh-i18n; \
+		test -x dist/git-sh-i18n--envsubst; \
 		test ! -e dist/git-cvsserver; \
 		test ! -e dist/git-lfs; \
 		test ! -e dist/git-filter-repo; \
@@ -82,14 +87,20 @@ macos:
 			git-upload-archive \
 			git-shell \
 			git-upload-pack \
-			git-receive-pack; \
+			git-receive-pack \
+			git-submodule \
+			git-submodule--helper \
+			git-sh-setup \
+			git-sh-i18n \
+			git-sh-i18n--envsubst; \
 		"$$cc" --version | sed -n '1p'; \
 		"$(GIT_SOURCE_DIR)/git" --version; \
-		"$$strip" -S -x "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell"; \
+		"$$strip" -S -x "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst"; \
 		rm -rf "$(MACOS_DIST)"; \
 		mkdir -p "$(MACOS_DIST)"; \
-		cp -a "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(MACOS_DIST)/"; \
-		for helper in git-upload-archive git-upload-pack git-receive-pack; do \
+		cp -a "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-submodule" "$(GIT_SOURCE_DIR)/git-sh-setup" "$(GIT_SOURCE_DIR)/git-sh-i18n" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst" "$(MACOS_DIST)/"; \
+		chmod 644 "$(MACOS_DIST)/git-sh-setup" "$(MACOS_DIST)/git-sh-i18n"; \
+		for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do \
 			test -x "$(GIT_SOURCE_DIR)/$$helper"; \
 			ln -s git "$(MACOS_DIST)/$$helper"; \
 		done; \

@@ -1,8 +1,11 @@
 # git-minimal-musl-static
 
 Minimal Git for macOS arm64 and static Linux musl (arm64, amd64), shipped as
-one `bin` directory holding `git`, `git-shell`, and three helper symlinks
-(`git-upload-archive`, `git-upload-pack`, `git-receive-pack`) pointing at `git`.
+one `bin` directory holding `git`, `git-shell`, `git-sh-i18n--envsubst`,
+the submodule script and shell libs (`git-submodule`, `git-sh-setup`,
+`git-sh-i18n`), and four helper symlinks (`git-upload-archive`,
+`git-upload-pack`, `git-receive-pack`, `git-submodule--helper`) pointing at
+`git`.
 
 HTTPS remotes are unsupported and fail with `Unable to find remote helper`.
 Perl, Python, gettext, Expat, cURL, Gitweb, and Rust are omitted.

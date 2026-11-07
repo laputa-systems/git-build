@@ -16,17 +16,20 @@ sh test/runtime.sh                # needs GIT_BIN_DIR pointing at binaries
 
 Invariants: `version=` in `scripts/download-git-source.sh` is the only
 version string — `Makefile`, `Dockerfile`, and `test/runtime.sh` derive from
-it. Every target ships the same five files: `git`, `git-shell`, and three
-relative helper symlinks to `git`. HTTPS remotes must fail naming the missing
-remote helper. SSH-only transport is a product decision: never reintroduce
-libcurl or a TLS stack to regain HTTPS.
+it. Every target ships the same ten files: `git`, `git-shell`,
+`git-sh-i18n--envsubst`, the `git-submodule` script plus
+`git-sh-setup`/`git-sh-i18n` shell libs, and four relative helper symlinks
+to `git` (three pack transport helpers plus `git-submodule--helper`). HTTPS
+remotes must fail naming the missing remote helper. SSH-only transport is a
+product decision: never reintroduce libcurl or a TLS stack to regain HTTPS.
 
 To upgrade Git, update `version=` and `archive_sha256=` in
 `scripts/download-git-source.sh`, run it to refresh `src/`, then verify with
 `make macos` and `make git`.
 
-`test/runtime.sh` also exercises bare-remote clone/push/fetch/merge/rebase;
-release jobs rerun it against each extracted ZIP.
+`test/runtime.sh` also exercises bare-remote clone/push/fetch/merge/rebase
+and submodule add/update/status; release jobs rerun it against each
+extracted ZIP.
 
 Releases come from `.github/workflows/release.yml` (manual dispatch, three
 matrix triples, verified `SHA256SUMS`); `sh scripts/audit-release.sh` checks
