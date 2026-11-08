@@ -17,8 +17,8 @@ RUN apk add --no-cache \
         llvm22=22.1.3-r1 \
         linux-headers=7.0.0-r1 \
         make=4.4.1-r4 \
-        zlib-dev=1.3.2-r1 \
-        zlib-static=1.3.2-r1
+        zlib-dev=1.4-r0 \
+        zlib-static=1.4-r0
 
 ENV PATH=/usr/lib/llvm22/bin:$PATH \
     CC=clang \
