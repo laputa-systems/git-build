@@ -20,7 +20,7 @@ env:
 jobs:
   preflight:
     name: Preflight
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     permissions:
       contents: read
@@ -58,12 +58,12 @@ jobs:
             kind: macos
             triple: aarch64-apple-darwin
           - name: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             kind: linux
             triple: aarch64-unknown-linux-musl
             docker_platform: linux/arm64
           - name: linux-amd64
-            runner: ubuntu-latest
+            runner: ubuntu-26.04-arm
             kind: linux
             triple: x86_64-unknown-linux-musl
             docker_platform: linux/amd64
@@ -126,7 +126,7 @@ jobs:
   release:
     name: Create pre-release
     needs: [preflight, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
       contents: write
