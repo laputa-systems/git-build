@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-version=2.56.0
-archive_url="https://www.kernel.org/pub/software/scm/git/git-$version.tar.xz"
-archive_sha256=26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3
-
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+. "$script_dir/sha256.sh"
+version=$(sh "$script_dir/source-lock.sh" git version)
+archive_url=$(sh "$script_dir/source-lock.sh" git url)
+archive_sha256=$(sh "$script_dir/source-lock.sh" git sha256)
 repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 source_parent="$repo_root/src"
 source_dir="$source_parent/git-$version"
@@ -17,12 +17,11 @@ archive="$work_dir/git-$version.tar.xz"
 staged_dir="$work_dir/unpack/git-$version"
 
 command -v curl >/dev/null
-command -v shasum >/dev/null
 command -v tar >/dev/null
 command -v awk >/dev/null
 
 curl --fail --location --retry 3 --output "$archive" "$archive_url"
-printf '%s  %s\n' "$archive_sha256" "$archive" | shasum -a 256 -c -
+printf '%s  %s\n' "$archive_sha256" "$archive" | sha256 -c -
 mkdir -p "$work_dir/unpack"
 tar -xJf "$archive" -C "$work_dir/unpack"
 test -f "$staged_dir/Makefile"

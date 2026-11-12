@@ -1,56 +1,112 @@
 DOCKER_BUILD ?= docker buildx build
 DOCKER_BUILD_CACHE_ARGS ?=
-DOCKER_PLATFORM ?= linux/arm64
 
-GIT_VERSION ?= $(shell sed -n 's/^version=//p' scripts/download-git-source.sh)
-GIT_ARCHIVE_SHA256 ?= $(shell sed -n 's/^archive_sha256=//p' scripts/download-git-source.sh)
+HOST_OS := $(shell uname -s)
+HOST_ARCH := $(shell uname -m)
+ifeq ($(HOST_OS),Darwin)
+HOST_TARGET := aarch64-apple-darwin
+else ifeq ($(HOST_ARCH),x86_64)
+HOST_TARGET := x86_64-unknown-linux-musl
+else
+HOST_TARGET := aarch64-unknown-linux-musl
+endif
+TARGET ?= $(HOST_TARGET)
+
+ifeq ($(TARGET),x86_64-unknown-linux-musl)
+DOCKER_PLATFORM ?= linux/amd64
+else
+DOCKER_PLATFORM ?= linux/arm64
+endif
+
+OUT_DIR ?= out
+BIN_DIR ?= dist/$(TARGET)
+
+GIT_VERSION ?= $(shell sh scripts/source-lock.sh git version)
+GIT_ARCHIVE_URL ?= $(shell sh scripts/source-lock.sh git url)
+GIT_ARCHIVE_SHA256 ?= $(shell sh scripts/source-lock.sh git sha256)
+ZLIB_VERSION ?= $(shell sh scripts/source-lock.sh zlib version)
+ZLIB_ARCHIVE_URL ?= $(shell sh scripts/source-lock.sh zlib url)
+ZLIB_ARCHIVE_SHA256 ?= $(shell sh scripts/source-lock.sh zlib sha256)
 GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
 
-MACOS_DIST ?= dist/macos
 MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections -fstack-protector-strong
 MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 
-.PHONY: git lint macos
+.PHONY: build verify lint clean fetch package compile build-linux build-macos
 
 lint:
 	sh -n scripts/audit-release.sh
 	sh -n scripts/download-git-source.sh
 	sh -n scripts/package.sh
 	sh -n scripts/qualify-binaries.sh
+	sh -n scripts/sha256.sh
+	sh -n scripts/source-lock.sh
+	sh -n scripts/verify-archive.sh
 	sh -n test/runtime.sh
+	sh scripts/source-lock.sh check
 	sh scripts/audit-release.sh
 
-git:
+fetch:
+	sh scripts/download-git-source.sh
+
+build:
+	$(MAKE) compile TARGET=$(TARGET)
+	$(MAKE) package TARGET=$(TARGET)
+
+compile:
+	@case "$(TARGET)" in \
+		aarch64-apple-darwin) $(MAKE) fetch build-macos TARGET=$(TARGET) ;; \
+		x86_64-unknown-linux-musl|aarch64-unknown-linux-musl) $(MAKE) build-linux TARGET=$(TARGET) ;; \
+		*) echo "unsupported TARGET '$(TARGET)'" >&2; exit 1 ;; \
+	esac
+
+package:
+	sh scripts/package.sh "$(BIN_DIR)" "$(TARGET)" "$(OUT_DIR)"
+
+verify:
+	sh scripts/verify-archive.sh "$(OUT_DIR)" "$(TARGET)"
+
+clean:
+	rm -rf dist out src
+
+build-linux:
 	@set -eu; \
-		mkdir -p dist; \
-		rm -f dist/git dist/git-shell dist/git-upload-archive dist/git-upload-pack dist/git-receive-pack dist/git-submodule dist/git-submodule--helper dist/git-sh-setup dist/git-sh-i18n dist/git-sh-i18n--envsubst; \
+		rm -rf "$(BIN_DIR)"; \
+		mkdir -p "$(BIN_DIR)"; \
 		$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) \
 			--platform=$(DOCKER_PLATFORM) \
 			--progress=plain \
 			--build-arg=GIT_VERSION=$(GIT_VERSION) \
+			--build-arg=GIT_ARCHIVE_URL=$(GIT_ARCHIVE_URL) \
 			--build-arg=GIT_ARCHIVE_SHA256=$(GIT_ARCHIVE_SHA256) \
+			--build-arg=ZLIB_VERSION=$(ZLIB_VERSION) \
+			--build-arg=ZLIB_ARCHIVE_URL=$(ZLIB_ARCHIVE_URL) \
+			--build-arg=ZLIB_ARCHIVE_SHA256=$(ZLIB_ARCHIVE_SHA256) \
 			--target=artifacts \
-			--output=type=local,dest=dist \
+			--output=type=local,dest=$(BIN_DIR) \
 			.; \
-		test -s dist/git; \
+		test -s "$(BIN_DIR)/git"; \
 		for helper in git-upload-archive git-shell git-upload-pack git-receive-pack; do \
-			test -x "dist/$$helper"; \
+			test -x "$(BIN_DIR)/$$helper"; \
 		done; \
-		test -x dist/git-submodule; \
-		test -x dist/git-submodule--helper; \
-		test -s dist/git-sh-setup; \
-		test -s dist/git-sh-i18n; \
-		test -x dist/git-sh-i18n--envsubst; \
-		test ! -e dist/git-cvsserver; \
-		test ! -e dist/git-lfs; \
-		test ! -e dist/git-filter-repo; \
-		echo "Wrote dist/git and dist/git-*"
+		test -x "$(BIN_DIR)/git-submodule"; \
+		test -x "$(BIN_DIR)/git-submodule--helper"; \
+		test -s "$(BIN_DIR)/git-sh-setup"; \
+		test -s "$(BIN_DIR)/git-sh-i18n"; \
+		test -x "$(BIN_DIR)/git-sh-i18n--envsubst"; \
+		test -s "$(BIN_DIR)/linker-trace"; \
+		test ! -e "$(BIN_DIR)/git-cvsserver"; \
+		test ! -e "$(BIN_DIR)/git-lfs"; \
+		test ! -e "$(BIN_DIR)/git-filter-repo"; \
+		mkdir -p "$(OUT_DIR)"; \
+		cp "$(BIN_DIR)/linker-trace" "$(OUT_DIR)/linker-trace-$(TARGET)"; \
+		echo "Wrote $(BIN_DIR)/git and $(BIN_DIR)/git-*"
 
-macos:
+build-macos:
 	@set -eu; \
 		test "$$(uname -s)" = Darwin; \
 		test -f "$(GIT_SOURCE_DIR)/Makefile" || { \
-			echo "run ./scripts/download-git-source.sh first" >&2; \
+			echo "run make fetch first" >&2; \
 			exit 1; \
 		}; \
 		sdkroot="$$(xcrun --sdk macosx --show-sdk-path)"; \
@@ -96,20 +152,20 @@ macos:
 		"$$cc" --version | sed -n '1p'; \
 		"$(GIT_SOURCE_DIR)/git" --version; \
 		"$$strip" -S -x "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst"; \
-		rm -rf "$(MACOS_DIST)"; \
-		mkdir -p "$(MACOS_DIST)"; \
-		cp -a "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-submodule" "$(GIT_SOURCE_DIR)/git-sh-setup" "$(GIT_SOURCE_DIR)/git-sh-i18n" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst" "$(MACOS_DIST)/"; \
-		chmod 644 "$(MACOS_DIST)/git-sh-setup" "$(MACOS_DIST)/git-sh-i18n"; \
+		rm -rf "$(BIN_DIR)"; \
+		mkdir -p "$(BIN_DIR)"; \
+		cp -a "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-submodule" "$(GIT_SOURCE_DIR)/git-sh-setup" "$(GIT_SOURCE_DIR)/git-sh-i18n" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst" "$(BIN_DIR)/"; \
+		chmod 644 "$(BIN_DIR)/git-sh-setup" "$(BIN_DIR)/git-sh-i18n"; \
 		for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do \
 			test -x "$(GIT_SOURCE_DIR)/$$helper"; \
-			ln -s git "$(MACOS_DIST)/$$helper"; \
+			ln -s git "$(BIN_DIR)/$$helper"; \
 		done; \
-			test -x "$(MACOS_DIST)/git"; \
-			test -x "$(MACOS_DIST)/git-shell"; \
-		expected_exec_path="$$("$(MACOS_DIST)/git" --exec-path)"; \
-		GIT_BIN_DIR="$(abspath $(MACOS_DIST))" \
+			test -x "$(BIN_DIR)/git"; \
+			test -x "$(BIN_DIR)/git-shell"; \
+		expected_exec_path="$$("$(BIN_DIR)/git" --exec-path)"; \
+		GIT_BIN_DIR="$(abspath $(BIN_DIR))" \
 		GIT_EXPECTED_EXEC_PATH="$$expected_exec_path" \
 		GIT_EXPECTED_VERSION="$(GIT_VERSION)" \
 		GIT_QUALIFY_SCRIPT="$(abspath scripts/qualify-binaries.sh)" \
 			sh test/runtime.sh; \
-		echo "Wrote $(MACOS_DIST)/git and $(MACOS_DIST)/git-*"
+		echo "Wrote $(BIN_DIR)/git and $(BIN_DIR)/git-*"
