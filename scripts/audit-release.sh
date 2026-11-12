@@ -30,11 +30,13 @@ grep -q "default_branch" "$file" || { echo "audit 2: no default-branch guard" >&
 grep -q "refs/heads/" "$file" || { echo "audit 2: no refs/heads/ ref check" >&2; exit 1; }
 check "2 preflight refuses non-default-branch refs"
 
-triples=$(grep -c "triple: " "$file")
+triples=$(grep -cE "^ +target: [a-z0-9_-]+$" "$file")
 test "$triples" -eq 3 || { echo "audit 3: want 3 matrix triples, found $triples" >&2; exit 1; }
 for triple in aarch64-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
     grep -q "$triple" "$file" || { echo "audit 3: triple $triple is missing" >&2; exit 1; }
 done
+grep -q "git-\$version-\$target.tar.xz" "$file" || { echo "audit 3: archive naming is not git-<version>-<target>.tar.xz" >&2; exit 1; }
+grep -q "git-\$version-\$target.manifest.json" "$file" || { echo "audit 3: manifest naming is not git-<version>-<target>.manifest.json" >&2; exit 1; }
 check "3 exactly the three matrix targets"
 
 uses=$(grep -E "uses:[[:space:]]*[^[:space:]]+@" "$file" | sed 's/^ *//')

@@ -1,4 +1,5 @@
 /dist/
+/out/
 
 # The upstream source archive and its trimmed extraction are fetched and
 # verified by scripts/download-git-source.sh; neither is checked in.

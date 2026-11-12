@@ -7,7 +7,7 @@ if [ -n "${GIT_EXPECTED_VERSION:-}" ]; then
     expected_version=$GIT_EXPECTED_VERSION
 else
     script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-    expected_version=$(sed -n 's/^version=//p' "$script_dir/../scripts/download-git-source.sh")
+    expected_version=$(sh "$script_dir/../scripts/source-lock.sh" git version)
 fi
 
 test -x "$git"
