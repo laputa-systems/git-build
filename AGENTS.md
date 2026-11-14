@@ -34,7 +34,7 @@ and submodule add/update/status; `make verify` reruns it against each
 extracted archive.
 
 Releases come from `.github/workflows/release.yml` (manual dispatch, three
-matrix targets, `git-<version>-<target>.tar.xz` and `.manifest.json` assets,
+matrix targets, `git-<version>-<target>.zip` and `.manifest.json` assets,
 verified `SHA256SUMS`); `sh scripts/audit-release.sh` checks the workflow
 contract. The manifest format lives in `scripts/package.sh`. The Linux
 `Dockerfile` builds from the shared musl-toolchain image and emits

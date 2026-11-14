@@ -35,7 +35,7 @@ test "$triples" -eq 3 || { echo "audit 3: want 3 matrix triples, found $triples"
 for triple in aarch64-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
     grep -q "$triple" "$file" || { echo "audit 3: triple $triple is missing" >&2; exit 1; }
 done
-grep -q "git-\$version-\$target.tar.xz" "$file" || { echo "audit 3: archive naming is not git-<version>-<target>.tar.xz" >&2; exit 1; }
+grep -q "git-\$version-\$target.zip" "$file" || { echo "audit 3: archive naming is not git-<version>-<target>.zip" >&2; exit 1; }
 grep -q "git-\$version-\$target.manifest.json" "$file" || { echo "audit 3: manifest naming is not git-<version>-<target>.manifest.json" >&2; exit 1; }
 check "3 exactly the three matrix targets"
 

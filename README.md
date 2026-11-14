@@ -12,14 +12,14 @@ Perl, Python, gettext, Expat, cURL, Gitweb, and Rust are omitted.
 
 ## Install
 
-Get `git-<version>-<target>.tar.xz` and `SHA256SUMS` from the
+Get `git-<version>-<target>.zip` and `SHA256SUMS` from the
 [prereleases](https://github.com/laputa-systems/git-build/releases), then
 check just your asset and install it:
 
 ```sh
-grep -F 'git-2.56.0-aarch64-apple-darwin.tar.xz' SHA256SUMS > CHECKSUM
+grep -F 'git-2.56.0-aarch64-apple-darwin.zip' SHA256SUMS > CHECKSUM
 shasum -a 256 -c CHECKSUM
-tar -xJf git-2.56.0-aarch64-apple-darwin.tar.xz -C ~/.local/bin
+unzip -q git-2.56.0-aarch64-apple-darwin.zip -d ~/.local/bin
 ```
 
 Targets: `aarch64-apple-darwin`, `aarch64-unknown-linux-musl`,

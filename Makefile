@@ -35,6 +35,7 @@ MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 .PHONY: build verify lint clean fetch package compile build-linux build-macos
 
 lint:
+	sh -n scripts/archive.sh
 	sh -n scripts/audit-release.sh
 	sh -n scripts/download-git-source.sh
 	sh -n scripts/package.sh

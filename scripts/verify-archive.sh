@@ -18,6 +18,7 @@ repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 
 . "$script_dir/sha256.sh"
 command -v jaq >/dev/null || { echo "verify: jaq is required" >&2; exit 1; }
+command -v unzip >/dev/null || { echo "verify: unzip is required" >&2; exit 1; }
 
 fail() {
     echo "verify: $1" >&2
@@ -25,7 +26,7 @@ fail() {
 }
 
 version=$(sh "$script_dir/source-lock.sh" git version)
-archive="$out_dir/git-$version-$triple.tar.xz"
+archive="$out_dir/git-$version-$triple.zip"
 manifest="$out_dir/git-$version-$triple.manifest.json"
 test -f "$archive" || fail "$archive is missing"
 test -f "$manifest" || fail "$manifest is missing"
@@ -47,12 +48,12 @@ jaq -e \
 
 expected=$(printf '%s\n' git git-receive-pack git-sh-i18n git-sh-i18n--envsubst git-sh-setup \
     git-shell git-submodule git-submodule--helper git-upload-archive git-upload-pack)
-actual=$(tar -tJf "$archive" | LC_ALL=C sort)
+actual=$(unzip -Z1 "$archive" | LC_ALL=C sort)
 test "$actual" = "$expected" || fail "$archive has unexpected contents: $actual"
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-verify.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
-tar -xJf "$archive" -C "$work_dir"
+unzip -q "$archive" -d "$work_dir"
 
 GIT_BIN_DIR="$work_dir" \
 GIT_EXPECTED_VERSION="$version" \

@@ -37,3 +37,4 @@
 /src/git-*/GIT-USER-AGENT
 /src/git-*/GIT-VERSION-FILE
 /src/git-*/version-def.h
+/tools/make-archive/target/

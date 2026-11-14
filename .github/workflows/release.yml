@@ -80,7 +80,7 @@ jobs:
         with:
           name: git-${{ matrix.target }}
           path: |
-            out/git-*-${{ matrix.target }}.tar.xz
+            out/git-*-${{ matrix.target }}.zip
             out/git-*-${{ matrix.target }}.manifest.json
             out/linker-trace-${{ matrix.target }}
           if-no-files-found: error
@@ -133,12 +133,12 @@ jobs:
 
       - name: Extract release archives
         run: |
-          for archive in dist/git-*.tar.xz; do
+          for archive in dist/git-*.zip; do
             name=${archive##*/}
-            target=${name%.tar.xz}
+            target=${name%.zip}
             target=${target#git-*-}
             mkdir -p "dist/extracted/$target"
-            tar -xJf "$archive" -C "dist/extracted/$target"
+            unzip -q "$archive" -d "dist/extracted/$target"
           done
           cat dist/linker-trace-* > "$RUNNER_TEMP/linker-trace"
 
@@ -392,7 +392,7 @@ jobs:
           lock_sha256=$(sha256sum sources.lock.json | cut -d ' ' -f 1)
           expected=""
           for target in aarch64-apple-darwin aarch64-unknown-linux-musl x86_64-unknown-linux-musl; do
-            expected+="git-$version-$target.manifest.json"$'\n'"git-$version-$target.tar.xz"$'\n'
+            expected+="git-$version-$target.manifest.json"$'\n'"git-$version-$target.zip"$'\n'
             jaq -e \
               --arg version "$version" \
               --arg target "$target" \
@@ -403,7 +403,7 @@ jobs:
                 and .sources_lock_sha256 == $lock' \
               "dist/git-$version-$target.manifest.json" >/dev/null
           done
-          actual="$(cd dist && ls git-*.tar.xz git-*.manifest.json | LC_ALL=C sort)"$'\n'
+          actual="$(cd dist && ls git-*.zip git-*.manifest.json | LC_ALL=C sort)"$'\n'
           if [[ "$actual" != "$expected" ]]; then
             echo "missing, duplicate, or extra release assets:" >&2
             echo "$actual" >&2
@@ -412,7 +412,7 @@ jobs:
 
       - name: Consolidate SHA256SUMS
         run: |
-          (cd dist && sha256sum git-*.tar.xz git-*.manifest.json | LC_ALL=C sort -k 2 > SHA256SUMS)
+          (cd dist && sha256sum git-*.zip git-*.manifest.json | LC_ALL=C sort -k 2 > SHA256SUMS)
           (cd dist && sha256sum -c SHA256SUMS)
 
       - name: Create release tag at triggering SHA
@@ -475,4 +475,4 @@ jobs:
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --prerelease --verify-tag --notes-file "$RUNNER_TEMP/release-notes.md" \
             --title "$RELEASE_TAG" \
-            dist/git-*.tar.xz dist/git-*.manifest.json dist/SHA256SUMS
+            dist/git-*.zip dist/git-*.manifest.json dist/SHA256SUMS
