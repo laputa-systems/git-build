@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.18@sha256:dabfc0969b935b2080555ace70ee69a5261af8a8f1b4df97b9e7fbcf6722eddf
 
-FROM ghcr.io/joshuarli/musl-toolchain@sha256:a9802a6f0658ad344fd6b2577891194019ab86de1a4d494e32c9bbec820e863e AS build
+FROM ghcr.io/joshuarli/musl-toolchain@sha256:8a372c6a873b7613987fecc1102f68fb16f4fc4e607432adad924dc1506eae54 AS build
 
 RUN apk add --no-cache linux-headers=7.0.0-r1
 
