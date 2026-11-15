@@ -32,9 +32,13 @@ GIT_SOURCE_DIR ?= src/git-$(GIT_VERSION)
 MACOS_CFLAGS ?= -O3 -flto -DNDEBUG -pipe -ffunction-sections -fdata-sections -fstack-protector-strong
 MACOS_LDFLAGS ?= -flto -Wl,-dead_strip
 
-.PHONY: build verify lint clean fetch package compile build-linux build-macos
+.PHONY: build verify test lint clean fetch package compile build-linux build-macos
+
+test:
+	sh tests/package-archive.sh
 
 lint:
+	sh -n tests/package-archive.sh
 	sh -n scripts/archive.sh
 	sh -n scripts/audit-release.sh
 	sh -n scripts/download-git-source.sh
