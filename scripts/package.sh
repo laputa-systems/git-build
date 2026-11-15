@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Package one target's binaries as git-<version>-<triple>.zip plus a
+# Package one target's binaries as git-<version>-<triple>.tar.xz plus a
 # git-<version>-<triple>.manifest.json, then refresh and verify
 # <out_dir>/SHA256SUMS over every packaged asset.
 # Usage: sh scripts/package.sh <bin_dir> <triple> <out_dir> [toolchain]
@@ -33,7 +33,6 @@ lock="$repo_root/sources.lock.json"
 
 . "$script_dir/sha256.sh"
 . "$script_dir/archive.sh"
-command -v cargo >/dev/null || { echo "package: cargo is required" >&2; exit 1; }
 command -v jaq >/dev/null || { echo "package: jaq is required" >&2; exit 1; }
 test -f "$qualify" || { echo "package: $qualify is missing" >&2; exit 1; }
 
@@ -62,7 +61,7 @@ test -n "$toolchain" || { echo "package: cannot determine toolchain" >&2; exit 1
 
 mkdir -p "$out_dir"
 out_dir=$(CDPATH= cd -- "$out_dir" && pwd -P)
-archive_name="git-$version-$triple.zip"
+archive_name="git-$version-$triple.tar.xz"
 manifest_name="git-$version-$triple.manifest.json"
 rm -f "$out_dir/$archive_name" "$out_dir/$manifest_name"
 archived="git git-shell git-upload-archive git-upload-pack git-receive-pack git-submodule git-submodule--helper git-sh-setup git-sh-i18n git-sh-i18n--envsubst"
@@ -89,7 +88,7 @@ jaq -n \
         toolchain: $toolchain
     }' > "$out_dir/$manifest_name"
 
-(cd "$out_dir" && sha256 git-*.zip git-*.manifest.json | LC_ALL=C sort -k 2 > SHA256SUMS.tmp)
+(cd "$out_dir" && sha256 git-*.tar.xz git-*.manifest.json | LC_ALL=C sort -k 2 > SHA256SUMS.tmp)
 mv "$out_dir/SHA256SUMS.tmp" "$out_dir/SHA256SUMS"
 (cd "$out_dir" && sha256 -c SHA256SUMS)
 
