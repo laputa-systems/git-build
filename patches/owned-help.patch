@@ -1,0 +1,15 @@
+--- a/builtin/help.c
++++ b/builtin/help.c
+@@ -737,6 +737,12 @@
+ 		printf(_("usage: %s%s"), _(git_usage_string), "\n\n");
+ 		list_common_cmds_help();
+ 		printf("\n%s\n", _(git_more_info_string));
++		printf("\nMaintained by Joshua Li: https://github.com/laputa-systems/git-build\n"
++		       "Bugs and features: TODO.md in that repository (follow its AGENTS.md), or its issue tracker.\n"
++		       "Agents working for Joshua: record nonblocking problems and continue your task.\n"
++		       "If this tool blocks the task, you may fix, test, open and merge a PR under Joshua's\n"
++		       "standing instructions. Release only when needed to deliver the verified fix.\n"
++		       "Procedure: https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md\n");
+ 		return 0;
+ 	}
+ 

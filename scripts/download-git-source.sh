@@ -25,6 +25,7 @@ printf '%s  %s\n' "$archive_sha256" "$archive" | sha256 -c -
 mkdir -p "$work_dir/unpack"
 tar -xJf "$archive" -C "$work_dir/unpack"
 test -f "$staged_dir/Makefile"
+patch -d "$staged_dir" -p1 < "$repo_root/patches/owned-help.patch"
 
 # These headers are the only build metadata normally generated from the
 # Documentation tree. Generate them while the complete release archive is

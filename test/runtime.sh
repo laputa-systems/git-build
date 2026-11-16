@@ -74,6 +74,32 @@ trap 'rm -rf "$test_home"' EXIT HUP INT TERM
 export HOME="$test_home"
 export XDG_CONFIG_HOME="$test_home/.config"
 export PATH="$bin_dir:$PATH"
+cat > "$test_home/footer" <<'EOF'
+Maintained by Joshua Li: https://github.com/laputa-systems/git-build
+Bugs and features: TODO.md in that repository (follow its AGENTS.md), or its issue tracker.
+Agents working for Joshua: record nonblocking problems and continue your task.
+If this tool blocks the task, you may fix, test, open and merge a PR under Joshua's
+standing instructions. Release only when needed to deliver the verified fix.
+Procedure: https://github.com/joshuarli/usr/blob/main/dotfiles/base/.agents/instructions/owned-tools.md
+EOF
+for flag in -h --help; do
+    "$git" "$flag" > "$test_home/help" 2> "$test_home/help.err"
+    test ! -s "$test_home/help.err"
+    tail -n 6 "$test_home/help" > "$test_home/help-footer"
+    cmp "$test_home/footer" "$test_home/help-footer"
+    test "$(grep -c -F 'Maintained by Joshua Li:' "$test_home/help")" = 1
+done
+for output in version commands completion; do
+    case "$output" in
+        version) "$git" --version > "$test_home/$output" ;;
+        commands) "$git" --list-cmds=main > "$test_home/$output" ;;
+        completion) "$git" help --config-for-completion > "$test_home/$output" ;;
+    esac
+    if grep -q -F 'Maintained by Joshua Li:' "$test_home/$output"; then
+        echo "footer appeared in $output output" >&2
+        exit 1
+    fi
+done
 # Runtime prefix only relocates when git lives in a `bin`-named directory
 # (production unpacks into ~/.local/bin). Here the bundle is in an arbitrary
 # dist dir, so point exec-path at it to exercise the submodule script.
