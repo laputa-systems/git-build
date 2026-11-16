@@ -79,6 +79,7 @@ build-linux:
 		rm -rf "$(BIN_DIR)"; \
 		mkdir -p "$(BIN_DIR)"; \
 		$(DOCKER_BUILD) $(DOCKER_BUILD_CACHE_ARGS) \
+			--build-context=git-patches=./patches \
 			--platform=$(DOCKER_PLATFORM) \
 			--progress=plain \
 			--build-arg=GIT_VERSION=$(GIT_VERSION) \

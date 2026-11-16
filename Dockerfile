@@ -34,6 +34,9 @@ RUN set -eux; \
 
 WORKDIR /src/git-${GIT_VERSION}
 
+COPY --from=git-patches /owned-help.patch /tmp/owned-help.patch
+RUN git apply /tmp/owned-help.patch
+
 # musl does not expose REG_STARTEND; use Git's compatibility regex. The
 # builder's default clang config links its bundled libc.a; compile and link
 # against the image's /usr/lib/libc.a instead and record the linker trace for
