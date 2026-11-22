@@ -72,7 +72,12 @@ verify:
 	sh scripts/verify-archive.sh "$(OUT_DIR)" "$(TARGET)"
 
 clean:
-	rm -rf dist out src
+	@for artifact in ./dist ./out; do \
+	  if test -L "$$artifact" || { test -e "$$artifact" && ! test -d "$$artifact"; }; then \
+	    printf '%s\n' "make clean: $$artifact must be a local build directory" >&2; exit 1; \
+	  fi; \
+	done
+	rm -rf -- ./dist ./out
 
 build-linux:
 	@set -eu; \

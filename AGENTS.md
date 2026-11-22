@@ -1,5 +1,7 @@
 # git-minimal-musl-static
 
+`make clean` removes local release and package outputs and preserves fetched sources.
+
 Minimal Git for macOS arm64 and static Linux musl. Linux builds in the shared musl-toolchain image
 (clang, musl and zlib built without GCC) and ships hardened static PIE; macOS uses system Clang and keeps
 iconv for filename normalization. Both omit HTTPS/cURL, Expat, gettext, Perl,
