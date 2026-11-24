@@ -41,3 +41,5 @@ verified `SHA256SUMS`); `sh scripts/audit-release.sh` checks the workflow
 contract. The manifest format lives in `scripts/package.sh`. The Linux
 `Dockerfile` builds from the shared musl-toolchain image and emits
 `linker-trace`, which the release job passes to the static ELF check.
+
+The roadmap, [docs/roadmap.md](docs/roadmap.md), holds all current and future work; its Status is the resume point.
