@@ -26,6 +26,7 @@ mkdir -p "$work_dir/unpack"
 tar -xJf "$archive" -C "$work_dir/unpack"
 test -f "$staged_dir/Makefile"
 patch -d "$staged_dir" -p1 < "$repo_root/patches/owned-help.patch"
+patch -d "$staged_dir" -p1 < "$repo_root/patches/runtime-prefix-realpath.patch"
 
 # These headers are the only build metadata normally generated from the
 # Documentation tree. Generate them while the complete release archive is
@@ -104,8 +105,7 @@ for path in \
     po \
     RelNotes \
     subprojects \
-    t \
-    templates; do
+    t; do
     rm -rf "$staged_dir/$path"
 done
 
@@ -122,8 +122,7 @@ rm -f \
     "$staged_dir/http-walker.c" \
     "$staged_dir/http.c" \
     "$staged_dir/imap-send.c" \
-    "$staged_dir/remote-curl.c" \
-    "$staged_dir/scalar.c"
+    "$staged_dir/remote-curl.c"
 
 for file in \
     "$staged_dir"/git-*.perl \

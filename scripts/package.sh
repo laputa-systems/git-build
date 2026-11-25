@@ -1,21 +1,22 @@
 #!/bin/sh
 set -eu
 
-# Package one target's binaries as git-<version>-<triple>.tar.xz plus a
+# Package one target's relocatable prefix (bin/, libexec/, share/) as
+# git-<version>-<triple>.tar.xz plus a
 # git-<version>-<triple>.manifest.json, then refresh and verify
 # <out_dir>/SHA256SUMS over every packaged asset.
-# Usage: sh scripts/package.sh <bin_dir> <triple> <out_dir> [toolchain]
+# Usage: sh scripts/package.sh <prefix_dir> <triple> <out_dir> [toolchain]
 # Triples: aarch64-apple-darwin, x86_64-unknown-linux-musl,
 #          aarch64-unknown-linux-musl.
 # The toolchain argument defaults to the macOS compiler for the darwin triple
 # and to the pinned builder image in the Dockerfile for the linux triples.
 
 if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
-    echo "usage: sh scripts/package.sh <bin_dir> <triple> <out_dir> [toolchain]" >&2
+    echo "usage: sh scripts/package.sh <prefix_dir> <triple> <out_dir> [toolchain]" >&2
     exit 1
 fi
 
-bin_dir=$1
+prefix_dir=$1
 triple=$2
 out_dir=$3
 toolchain=${4:-}
@@ -36,7 +37,7 @@ lock="$repo_root/sources.lock.json"
 command -v jaq >/dev/null || { echo "package: jaq is required" >&2; exit 1; }
 test -f "$qualify" || { echo "package: $qualify is missing" >&2; exit 1; }
 
-sh "$qualify" "$bin_dir" || exit 1
+sh "$qualify" "$prefix_dir" || exit 1
 
 version=$(sh "$script_dir/source-lock.sh" git version)
 upstream_sha256=$(sh "$script_dir/source-lock.sh" git sha256)
@@ -64,9 +65,9 @@ out_dir=$(CDPATH= cd -- "$out_dir" && pwd -P)
 archive_name="git-$version-$triple.tar.xz"
 manifest_name="git-$version-$triple.manifest.json"
 rm -f "$out_dir/$archive_name" "$out_dir/$manifest_name"
-archived="git git-shell git-upload-archive git-upload-pack git-receive-pack git-submodule git-submodule--helper git-sh-setup git-sh-i18n git-sh-i18n--envsubst"
+archived="bin libexec share"
 # shellcheck disable=SC2086
-make_archive "$out_dir/$archive_name" "$bin_dir" $archived
+make_archive "$out_dir/$archive_name" "$prefix_dir" $archived
 
 jaq -n \
     --arg version "$version" \

@@ -46,18 +46,40 @@ jaq -e \
         and .sources_lock_sha256 == $lock' "$manifest" >/dev/null \
     || fail "$manifest does not match the build inputs"
 
-expected=$(printf '%s\n' git git-receive-pack git-sh-i18n git-sh-i18n--envsubst git-sh-setup \
-    git-shell git-submodule git-submodule--helper git-upload-archive git-upload-pack)
-actual=$(tar -tJf "$archive" | LC_ALL=C sort)
-test "$actual" = "$expected" || fail "$archive has unexpected contents: $actual"
+members=$(tar -tJf "$archive")
+top=$(printf '%s\n' "$members" | cut -d/ -f1 | LC_ALL=C sort -u)
+expected_top=$(printf '%s\n' bin libexec share)
+test "$top" = "$expected_top" || fail "$archive has unexpected top-level entries: $top"
+
+for required in \
+    bin/git bin/git-shell bin/scalar \
+    bin/git-upload-pack bin/git-receive-pack bin/git-upload-archive \
+    libexec/git-core/git-shell libexec/git-core/git-sh-i18n--envsubst \
+    libexec/git-core/git-submodule libexec/git-core/git-sh-setup libexec/git-core/git-sh-i18n \
+    libexec/git-core/git-upload-pack libexec/git-core/git-receive-pack \
+    libexec/git-core/git-upload-archive libexec/git-core/git-submodule--helper \
+    share/git-core/templates/hooks share/git-core/templates/info/exclude \
+    share/git-core/templates/description; do
+    printf '%s\n' "$members" | grep -Fx -e "$required" -e "$required/" >/dev/null \
+        || fail "$archive is missing $required"
+done
+for forbidden in git-cvsserver git-lfs git-filter-repo git-remote-http git-remote-https; do
+    if printf '%s\n' "$members" | grep -F "$forbidden" >/dev/null; then
+        fail "$archive contains forbidden $forbidden"
+    fi
+done
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/git-verify.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 tar -xJf "$archive" -C "$work_dir"
+work_dir=$(CDPATH= cd -- "$work_dir" && pwd -P)
 
-GIT_BIN_DIR="$work_dir" \
+GIT_BIN_DIR="$work_dir/bin" \
 GIT_EXPECTED_VERSION="$version" \
+GIT_EXPECTED_EXEC_PATH="$work_dir/libexec/git-core" \
 GIT_QUALIFY_SCRIPT="$script_dir/qualify-binaries.sh" \
     sh "$script_dir/../test/runtime.sh"
+
+sh "$repo_root/tests/relocatable-layout.sh" "$work_dir"
 
 printf 'Verified %s\n' "$archive"

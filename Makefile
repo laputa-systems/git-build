@@ -39,6 +39,7 @@ test:
 
 lint:
 	sh -n tests/package-archive.sh
+	sh -n tests/relocatable-layout.sh
 	sh -n scripts/archive.sh
 	sh -n scripts/audit-release.sh
 	sh -n scripts/download-git-source.sh
@@ -96,22 +97,41 @@ build-linux:
 			--target=artifacts \
 			--output=type=local,dest=$(BIN_DIR) \
 			.; \
-		test -s "$(BIN_DIR)/git"; \
-		for helper in git-upload-archive git-shell git-upload-pack git-receive-pack; do \
-			test -x "$(BIN_DIR)/$$helper"; \
+		for program in git git-shell scalar; do \
+			test -x "$(BIN_DIR)/bin/$$program"; \
 		done; \
-		test -x "$(BIN_DIR)/git-submodule"; \
-		test -x "$(BIN_DIR)/git-submodule--helper"; \
-		test -s "$(BIN_DIR)/git-sh-setup"; \
-		test -s "$(BIN_DIR)/git-sh-i18n"; \
-		test -x "$(BIN_DIR)/git-sh-i18n--envsubst"; \
+		for helper in git-upload-pack git-receive-pack git-upload-archive; do \
+			test -L "$(BIN_DIR)/bin/$$helper"; \
+			test "$$(readlink "$(BIN_DIR)/bin/$$helper")" = git; \
+		done; \
+		for program in git-shell git-sh-i18n--envsubst; do \
+			test -x "$(BIN_DIR)/libexec/git-core/$$program"; \
+		done; \
+		for lib in git-submodule git-sh-setup git-sh-i18n; do \
+			case "$$lib" in \
+				git-submodule) test -x "$(BIN_DIR)/libexec/git-core/$$lib" ;; \
+				*) test -s "$(BIN_DIR)/libexec/git-core/$$lib" ;; \
+			esac; \
+		done; \
+		for helper in git-upload-pack git-receive-pack git-upload-archive git-submodule--helper; do \
+			test -L "$(BIN_DIR)/libexec/git-core/$$helper"; \
+			test "$$(readlink "$(BIN_DIR)/libexec/git-core/$$helper")" = git; \
+		done; \
+		for program in git scalar; do \
+			test -L "$(BIN_DIR)/libexec/git-core/$$program"; \
+			test "$$(readlink "$(BIN_DIR)/libexec/git-core/$$program")" = ../../bin/$$program; \
+		done; \
+		for template in hooks info/exclude description; do \
+			test -e "$(BIN_DIR)/share/git-core/templates/$$template"; \
+		done; \
+		for forbidden in git-cvsserver git-lfs git-filter-repo git-remote-http git-remote-https; do \
+			test ! -e "$(BIN_DIR)/bin/$$forbidden"; \
+			test ! -e "$(BIN_DIR)/libexec/git-core/$$forbidden"; \
+		done; \
 		test -s "$(BIN_DIR)/linker-trace"; \
-		test ! -e "$(BIN_DIR)/git-cvsserver"; \
-		test ! -e "$(BIN_DIR)/git-lfs"; \
-		test ! -e "$(BIN_DIR)/git-filter-repo"; \
 		mkdir -p "$(OUT_DIR)"; \
 		cp "$(BIN_DIR)/linker-trace" "$(OUT_DIR)/linker-trace-$(TARGET)"; \
-		echo "Wrote $(BIN_DIR)/git and $(BIN_DIR)/git-*"
+		echo "Wrote $(BIN_DIR)/{bin,libexec/git-core,share/git-core/templates}"
 
 build-macos:
 	@set -eu; \
@@ -148,35 +168,53 @@ build-macos:
 			NO_TCLTK=YesPlease \
 			RUNTIME_PREFIX=YesPlease \
 			prefix=/usr \
-			bindir=/usr/bin \
-			gitexecdir=bin \
 			git \
-			git-upload-archive \
 			git-shell \
-			git-upload-pack \
-			git-receive-pack \
+			scalar \
 			git-submodule \
-			git-submodule--helper \
 			git-sh-setup \
 			git-sh-i18n \
 			git-sh-i18n--envsubst; \
 		"$$cc" --version | sed -n '1p'; \
 		"$(GIT_SOURCE_DIR)/git" --version; \
-		"$$strip" -S -x "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst"; \
+		"$$strip" -S -x "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/scalar" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst"; \
 		rm -rf "$(BIN_DIR)"; \
-		mkdir -p "$(BIN_DIR)"; \
-		cp -a "$(GIT_SOURCE_DIR)/git" "$(GIT_SOURCE_DIR)/git-shell" "$(GIT_SOURCE_DIR)/git-submodule" "$(GIT_SOURCE_DIR)/git-sh-setup" "$(GIT_SOURCE_DIR)/git-sh-i18n" "$(GIT_SOURCE_DIR)/git-sh-i18n--envsubst" "$(BIN_DIR)/"; \
-		chmod 644 "$(BIN_DIR)/git-sh-setup" "$(BIN_DIR)/git-sh-i18n"; \
-		for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do \
-			test -x "$(GIT_SOURCE_DIR)/$$helper"; \
-			ln -s git "$(BIN_DIR)/$$helper"; \
+		mkdir -p "$(BIN_DIR)/bin" "$(BIN_DIR)/libexec/git-core" "$(BIN_DIR)/share/git-core"; \
+		src="$(GIT_SOURCE_DIR)"; \
+		for program in git git-shell scalar; do \
+			test -x "$$src/$$program"; \
+			cp -p "$$src/$$program" "$(BIN_DIR)/bin/$$program"; \
 		done; \
-			test -x "$(BIN_DIR)/git"; \
-			test -x "$(BIN_DIR)/git-shell"; \
-		expected_exec_path="$$("$(BIN_DIR)/git" --exec-path)"; \
-		GIT_BIN_DIR="$(abspath $(BIN_DIR))" \
+		for helper in git-receive-pack git-upload-archive git-upload-pack; do \
+			ln -s git "$(BIN_DIR)/bin/$$helper"; \
+		done; \
+		for program in git-shell git-sh-i18n--envsubst; do \
+			test -x "$$src/$$program"; \
+			cp -p "$$src/$$program" "$(BIN_DIR)/libexec/git-core/$$program"; \
+		done; \
+		test -x "$$src/git-submodule"; \
+		cp -p "$$src/git-submodule" "$(BIN_DIR)/libexec/git-core/git-submodule"; \
+		for lib in git-sh-setup git-sh-i18n; do \
+			test -s "$$src/$$lib"; \
+			cp -p "$$src/$$lib" "$(BIN_DIR)/libexec/git-core/$$lib"; \
+		done; \
+		chmod 644 "$(BIN_DIR)/libexec/git-core/git-sh-setup" "$(BIN_DIR)/libexec/git-core/git-sh-i18n"; \
+		for helper in git-upload-pack git-receive-pack git-upload-archive git-submodule--helper; do \
+			ln -s git "$(BIN_DIR)/libexec/git-core/$$helper"; \
+		done; \
+		ln -s ../../bin/git "$(BIN_DIR)/libexec/git-core/git"; \
+		ln -s ../../bin/scalar "$(BIN_DIR)/libexec/git-core/scalar"; \
+		$(MAKE) -C "$$src/templates" all >/dev/null; \
+		mkdir -p "$(BIN_DIR)/share/git-core/templates"; \
+		(cd "$$src/templates/blt" && tar cf - .) | \
+			(cd "$(BIN_DIR)/share/git-core/templates" && tar xf -); \
+		rm -rf "$$src/templates/blt" "$$src/templates/boilerplates.made"; \
+			test -x "$(BIN_DIR)/bin/git"; \
+			test -x "$(BIN_DIR)/bin/git-shell"; \
+			expected_exec_path="$$(cd "$(BIN_DIR)" && pwd -P)/libexec/git-core"; \
+		GIT_BIN_DIR="$$(cd "$(BIN_DIR)/bin" && pwd -P)" \
 		GIT_EXPECTED_EXEC_PATH="$$expected_exec_path" \
 		GIT_EXPECTED_VERSION="$(GIT_VERSION)" \
 		GIT_QUALIFY_SCRIPT="$(abspath scripts/qualify-binaries.sh)" \
 			sh test/runtime.sh; \
-		echo "Wrote $(BIN_DIR)/git and $(BIN_DIR)/git-*"
+		echo "Wrote $(BIN_DIR)/bin, $(BIN_DIR)/libexec/git-core, $(BIN_DIR)/share/git-core/templates"

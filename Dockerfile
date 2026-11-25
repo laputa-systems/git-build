@@ -35,7 +35,8 @@ RUN set -eux; \
 WORKDIR /src/git-${GIT_VERSION}
 
 COPY --from=git-patches /owned-help.patch /tmp/owned-help.patch
-RUN git apply /tmp/owned-help.patch
+COPY --from=git-patches /runtime-prefix-realpath.patch /tmp/runtime-prefix-realpath.patch
+RUN git apply /tmp/owned-help.patch /tmp/runtime-prefix-realpath.patch
 
 # musl does not expose REG_STARTEND; use Git's compatibility regex. The
 # builder's default clang config links its bundled libc.a; compile and link
@@ -64,15 +65,10 @@ RUN set -eux; \
         NO_TCLTK=YesPlease \
         RUNTIME_PREFIX=YesPlease \
         prefix=/usr \
-        bindir=/usr/bin \
-        gitexecdir=bin \
         git \
-        git-upload-archive \
         git-shell \
-        git-upload-pack \
-        git-receive-pack \
+        scalar \
         git-submodule \
-        git-submodule--helper \
         git-sh-setup \
         git-sh-i18n \
         git-sh-i18n--envsubst \
@@ -80,22 +76,34 @@ RUN set -eux; \
     grep '^/' /tmp/build.log | LC_ALL=C sort -u > /trace/linker-trace; \
     test -s /trace/linker-trace; \
     ./git --version; \
-    llvm-strip --strip-unneeded git git-shell git-sh-i18n--envsubst; \
-    mkdir /out; \
-    test -x git; \
-    test -x git-shell; \
-    test -x git-submodule; \
-    test -x git-submodule--helper; \
-    test -s git-sh-setup; \
-    test -s git-sh-i18n; \
-    test -x git-sh-i18n--envsubst; \
-    cp -a git git-shell git-submodule git-sh-setup git-sh-i18n git-sh-i18n--envsubst /out/; \
-    chmod 644 /out/git-sh-setup /out/git-sh-i18n; \
-    for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do \
-        test -x "$helper"; \
-        ln -s git "/out/$helper"; \
+    llvm-strip --strip-unneeded git git-shell scalar git-sh-i18n--envsubst; \
+    mkdir -p /out/bin /out/libexec/git-core /out/share/git-core; \
+    for program in git git-shell scalar; do \
+        test -x "$program"; \
+        install -m 755 "$program" "/out/bin/$program"; \
     done; \
-    for helper in git git-shell; do \
+    for helper in git-receive-pack git-upload-archive git-upload-pack; do \
+        ln -s git "/out/bin/$helper"; \
+    done; \
+    for program in git-shell git-sh-i18n--envsubst git-submodule; do \
+        test -x "$program"; \
+        install -m 755 "$program" "/out/libexec/git-core/$program"; \
+    done; \
+    for lib in git-sh-setup git-sh-i18n; do \
+        test -s "$lib"; \
+        install -m 644 "$lib" "/out/libexec/git-core/$lib"; \
+    done; \
+    chmod 644 /out/libexec/git-core/git-sh-setup /out/libexec/git-core/git-sh-i18n; \
+    for helper in git-upload-pack git-receive-pack git-upload-archive git-submodule--helper; do \
+        ln -s git "/out/libexec/git-core/$helper"; \
+    done; \
+    ln -s ../../bin/git /out/libexec/git-core/git; \
+    ln -s ../../bin/scalar /out/libexec/git-core/scalar; \
+    make -C templates all >/dev/null; \
+    mkdir -p /out/share/git-core/templates; \
+    (cd templates/blt && tar cf - .) | (cd /out/share/git-core/templates && tar xf -); \
+    rm -rf templates/blt templates/boilerplates.made; \
+    for helper in git git-shell scalar; do \
         test -z "$(ldd "$helper" 2>&1 | grep -F '=>' || true)"; \
     done
 
@@ -109,13 +117,13 @@ FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4c
 ARG GIT_VERSION
 ENV GIT_EXPECTED_VERSION=${GIT_VERSION}
 
-COPY --from=build /out/ /usr/local/bin/
-COPY --chmod=755 test/runtime.sh /usr/local/bin/git-minimal-runtime-test
+COPY --from=build /out/ /opt/git-pkg/
+COPY --chmod=755 test/runtime.sh /opt/git-runtime-test
 
-RUN /usr/local/bin/git-minimal-runtime-test \
-    && rm /usr/local/bin/git-minimal-runtime-test
+RUN GIT_BIN_DIR=/opt/git-pkg/bin sh /opt/git-runtime-test \
+    && rm /opt/git-runtime-test
 
 FROM scratch AS artifacts
 
-COPY --from=runtime-test /usr/local/bin/ /
+COPY --from=build /out/ /
 COPY --from=build /trace/linker-trace /linker-trace
