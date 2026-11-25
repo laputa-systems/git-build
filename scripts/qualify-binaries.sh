@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-    echo "usage: sh scripts/qualify-binaries.sh <bin_dir>" >&2
+    echo "usage: sh scripts/qualify-binaries.sh <prefix_dir>" >&2
 }
 
 if [ "$#" -ne 1 ]; then
@@ -10,7 +10,9 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-bin_dir=$1
+prefix_dir=$1
+bin_dir="$prefix_dir/bin"
+exec_dir="$prefix_dir/libexec/git-core"
 git="$bin_dir/git"
 shell="$bin_dir/git-shell"
 
@@ -23,37 +25,60 @@ note() {
     echo "qualify: $1"
 }
 
-test -d "$bin_dir" || fail "$bin_dir is not a directory"
+test -d "$prefix_dir" || fail "$prefix_dir is not a directory"
+test -d "$bin_dir" || fail "$bin_dir is missing"
+test -d "$exec_dir" || fail "$exec_dir is missing"
 test -f "$git" || fail "$git is missing"
 test -f "$shell" || fail "$shell is missing"
 test -x "$git" || fail "$git is not executable"
 test -x "$shell" || fail "$shell is not executable"
+test -x "$bin_dir/scalar" || fail "$bin_dir/scalar is missing"
 test ! -L "$git" || fail "$git must not be a symlink"
 test ! -L "$shell" || fail "git-shell must be a separate executable, not a symlink"
+test ! -L "$bin_dir/scalar" || fail "scalar must be a separate executable, not a symlink"
 
-for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do
+for helper in git-receive-pack git-upload-archive git-upload-pack; do
     test -x "$bin_dir/$helper" || fail "$bin_dir/$helper is missing"
     test -L "$bin_dir/$helper" || fail "$bin_dir/$helper must be a symlink to git"
     target=$(readlink "$bin_dir/$helper")
     test "$target" = "git" || fail "$bin_dir/$helper links to $target, want git"
 done
 
-test -x "$bin_dir/git-submodule" || fail "$bin_dir/git-submodule is missing"
-test ! -L "$bin_dir/git-submodule" || fail "git-submodule must be a file, not a symlink"
+test -x "$exec_dir/git-shell" || fail "$exec_dir/git-shell is missing"
+test ! -L "$exec_dir/git-shell" || fail "exec-dir git-shell must be a file, not a symlink"
+test -x "$exec_dir/git-sh-i18n--envsubst" || fail "$exec_dir/git-sh-i18n--envsubst is missing"
+test ! -L "$exec_dir/git-sh-i18n--envsubst" || fail "git-sh-i18n--envsubst must be a separate executable, not a symlink"
+test -x "$exec_dir/git-submodule" || fail "$exec_dir/git-submodule is missing"
+test ! -L "$exec_dir/git-submodule" || fail "git-submodule must be a file, not a symlink"
 for lib in git-sh-setup git-sh-i18n; do
-    test -s "$bin_dir/$lib" || fail "$bin_dir/$lib is missing"
-    test ! -L "$bin_dir/$lib" || fail "$lib must be a file, not a symlink"
+    test -s "$exec_dir/$lib" || fail "$exec_dir/$lib is missing"
+    test ! -L "$exec_dir/$lib" || fail "$lib must be a file, not a symlink"
 done
-test -x "$bin_dir/git-sh-i18n--envsubst" || fail "$bin_dir/git-sh-i18n--envsubst is missing"
-test ! -L "$bin_dir/git-sh-i18n--envsubst" || fail "git-sh-i18n--envsubst must be a separate executable, not a symlink"
+for helper in git-upload-pack git-receive-pack git-upload-archive git-submodule--helper; do
+    test -x "$exec_dir/$helper" || fail "$exec_dir/$helper is missing"
+    test -L "$exec_dir/$helper" || fail "$exec_dir/$helper must be a symlink to git"
+    target=$(readlink "$exec_dir/$helper")
+    test "$target" = "git" || fail "$exec_dir/$helper links to $target, want git"
+done
+for program in git scalar; do
+    test -L "$exec_dir/$program" || fail "$exec_dir/$program must be a symlink"
+    target=$(readlink "$exec_dir/$program")
+    test "$target" = "../../bin/$program" || fail "$exec_dir/$program links to $target, want ../../bin/$program"
+done
+
+test -d "$prefix_dir/share/git-core/templates/hooks" || fail "share/git-core/templates/hooks is missing"
+test -e "$prefix_dir/share/git-core/templates/info/exclude" || fail "share/git-core/templates/info/exclude is missing"
 
 for omitted in git-cvsserver git-lfs git-filter-repo git-remote-http git-remote-https; do
     test ! -e "$bin_dir/$omitted" || fail "$bin_dir/$omitted must be absent"
+    test ! -e "$exec_dir/$omitted" || fail "$exec_dir/$omitted must be absent"
 done
 
 magic=$(od -A n -t x1 -N 4 "$git" | tr -d ' \n')
 shell_magic=$(od -A n -t x1 -N 4 "$shell" | tr -d ' \n')
+scalar_magic=$(od -A n -t x1 -N 4 "$bin_dir/scalar" | tr -d ' \n')
 test "$magic" = "$shell_magic" || fail "git and git-shell are different file types"
+test "$magic" = "$scalar_magic" || fail "git and scalar are different file types"
 
 case "$magic" in
     7f454c46)
@@ -76,7 +101,7 @@ if [ "$kind" = "elf" ]; then
         x86_64|amd64) host_arch=x86_64 ;;
     esac
 
-    for bin in "$git" "$shell"; do
+    for bin in "$git" "$shell" "$bin_dir/scalar"; do
         name=$(basename "$bin")
         headers=$(readelf -lW "$bin")
         dynamic=$(readelf -dW "$bin" 2>/dev/null || true)
@@ -119,6 +144,7 @@ if [ "$kind" = "elf" ]; then
     done
     if [ "$elf_arch" = "$host_arch" ]; then
         "$git" --version >/dev/null || fail "$git --version failed to execute"
+        "$bin_dir/scalar" version >/dev/null || fail "$bin_dir/scalar version failed to execute"
         note "git: executes ($("$git" --version))"
     else
         note "git: skipping exec smoke (binary $elf_arch, host $host_arch)"
@@ -127,7 +153,7 @@ else
     command -v otool >/dev/null || fail "otool is required to qualify macOS binaries"
     command -v codesign >/dev/null || fail "codesign is required to qualify macOS binaries"
 
-    for bin in "$git" "$shell"; do
+    for bin in "$git" "$shell" "$bin_dir/scalar"; do
         name=$(basename "$bin")
         mh=$(otool -hv "$bin")
         echo "$mh" | grep -q "ARM64" || fail "$bin is not arm64"
@@ -146,7 +172,8 @@ else
     done
 
     "$git" --version >/dev/null || fail "$git --version failed to execute"
+    "$bin_dir/scalar" version >/dev/null || fail "$bin_dir/scalar version failed to execute"
     note "git: executes ($("$git" --version))"
 fi
 
-note "qualified $bin_dir"
+note "qualified $prefix_dir"

@@ -16,15 +16,12 @@ make package TARGET=...           # archive and manifest from an existing dist/<
 make lint                         # shell syntax, sources.lock.json, release audit
 make clean
 sh scripts/qualify-binaries.sh dist/aarch64-apple-darwin
-sh test/runtime.sh                # needs GIT_BIN_DIR pointing at binaries
+sh test/runtime.sh                # needs GIT_BIN_DIR=<prefix>/bin
 ```
 
 Invariants: `sources.lock.json` is the only place the Git and zlib versions,
 URLs, and digests are written; `scripts/source-lock.sh` reads it with `jaq` for
-`Makefile`, `Dockerfile` build arguments, `scripts/*`, and `test/runtime.sh`. Every target ships the same ten files: `git`, `git-shell`,
-`git-sh-i18n--envsubst`, the `git-submodule` script plus
-`git-sh-setup`/`git-sh-i18n` shell libs, and four relative helper symlinks
-to `git` (three pack transport helpers plus `git-submodule--helper`). HTTPS
+`Makefile`, `Dockerfile` build arguments, `scripts/*`, and `test/runtime.sh`. Every target ships the same relocatable prefix: `bin/` with `git`, `git-shell`, `scalar`, and `git-receive-pack`/`git-upload-archive`/`git-upload-pack` symlinks to `git`; `libexec/git-core/` with `git-shell`, `git-sh-i18n--envsubst`, the `git-submodule` script, `git-sh-setup`/`git-sh-i18n`, and `git-upload-pack`/`git-receive-pack`/`git-upload-archive`/`git-submodule--helper` symlinks to `git`; and `share/git-core/templates/` with the upstream init templates. Git is built with `RUNTIME_PREFIX`, so the prefix works under any directory name; consumers add `<prefix>/bin` to `PATH`. HTTPS
 remotes must fail naming the missing remote helper. SSH-only transport is a
 product decision: never reintroduce libcurl or a TLS stack to regain HTTPS.
 

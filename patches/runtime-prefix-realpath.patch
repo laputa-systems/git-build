@@ -1,0 +1,24 @@
+--- a/exec-cmd.c	2026-11-25 06:49:16
++++ b/exec-cmd.c	2026-11-25 06:49:16
+@@ -257,6 +257,21 @@
+ 		return;
+ 	}
+ 
++	/*
++	 * Platform resolvers such as _NSGetExecutablePath may return a path
++	 * that still contains symlinks (for example when git was invoked
++	 * through a symlink). Resolve them so the runtime prefix is computed
++	 * from the real executable location, matching /proc/self/exe.
++	 */
++	{
++		struct strbuf real = STRBUF_INIT;
++
++		if (strbuf_realpath(&real, buf.buf, 0)) {
++			strbuf_swap(&buf, &real);
++		}
++		strbuf_release(&real);
++	}
++
+ 	resolved = strbuf_detach(&buf, NULL);
+ 	slash = find_last_dir_sep(resolved);
+ 	if (slash)

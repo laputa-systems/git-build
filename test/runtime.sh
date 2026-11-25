@@ -2,7 +2,10 @@
 set -eu
 
 bin_dir=${GIT_BIN_DIR:-/usr/local/bin}
+bin_dir=$(CDPATH= cd -- "$bin_dir" && pwd -P)
 git="$bin_dir/git"
+prefix_dir=$(dirname "$bin_dir")
+exec_dir="$prefix_dir/libexec/git-core"
 if [ -n "${GIT_EXPECTED_VERSION:-}" ]; then
     expected_version=$GIT_EXPECTED_VERSION
 else
@@ -16,7 +19,12 @@ test "$("$git" --version)" = "git version $expected_version"
 
 exec_path=$("$git" --exec-path)
 if [ -n "${GIT_EXPECTED_EXEC_PATH:-}" ]; then
-    test "$exec_path" = "$GIT_EXPECTED_EXEC_PATH"
+    want=$(CDPATH= cd -- "$(dirname "$GIT_EXPECTED_EXEC_PATH")" && pwd -P)/$(basename "$GIT_EXPECTED_EXEC_PATH")
+    got=$(CDPATH= cd -- "$exec_path" 2>/dev/null && pwd -P || printf '%s' "$exec_path")
+    test "$got" = "$want" || {
+        echo "exec-path $exec_path, want $want" >&2
+        exit 1
+    }
 else
     case "$exec_path" in
         /*) ;;
@@ -24,6 +32,10 @@ else
     esac
     case "$exec_path" in
         "$bin_dir"/*) echo "exec-path $exec_path tracks $bin_dir, want relocatable" >&2; exit 1 ;;
+    esac
+    case "$exec_path" in
+        */libexec/git-core) ;;
+        *) echo "exec-path $exec_path is not <prefix>/libexec/git-core" >&2; exit 1 ;;
     esac
 fi
 
@@ -44,29 +56,42 @@ check_linkage() {
 
 check_linkage "$git"
 check_linkage "$bin_dir/git-shell"
-check_linkage "$bin_dir/git-sh-i18n--envsubst"
+check_linkage "$bin_dir/scalar"
+check_linkage "$exec_dir/git-sh-i18n--envsubst"
 
 test -x "$bin_dir/git-shell"
 test ! -L "$bin_dir/git-shell"
-for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do
+test -x "$bin_dir/scalar"
+test ! -L "$bin_dir/scalar"
+for helper in git-upload-archive git-upload-pack git-receive-pack; do
     test -x "$bin_dir/$helper"
     test -L "$bin_dir/$helper"
 done
-test -x "$bin_dir/git-submodule"
-test ! -L "$bin_dir/git-submodule"
-test -s "$bin_dir/git-sh-setup"
-test -s "$bin_dir/git-sh-i18n"
-test -x "$bin_dir/git-sh-i18n--envsubst"
-test ! -L "$bin_dir/git-sh-i18n--envsubst"
 
-test ! -e "$bin_dir/git-cvsserver"
-test ! -e "$bin_dir/git-lfs"
-test ! -e "$bin_dir/git-filter-repo"
-test ! -e "$bin_dir/git-remote-http"
-test ! -e "$bin_dir/git-remote-https"
+test -x "$exec_dir/git-shell"
+test ! -L "$exec_dir/git-shell"
+for helper in git-upload-archive git-upload-pack git-receive-pack git-submodule--helper; do
+    test -x "$exec_dir/$helper"
+    test -L "$exec_dir/$helper"
+done
+for program in git scalar; do
+    test -L "$exec_dir/$program"
+done
+test -x "$exec_dir/git-submodule"
+test ! -L "$exec_dir/git-submodule"
+test -s "$exec_dir/git-sh-setup"
+test -s "$exec_dir/git-sh-i18n"
+test -x "$exec_dir/git-sh-i18n--envsubst"
+test ! -L "$exec_dir/git-sh-i18n--envsubst"
+test -d "$prefix_dir/share/git-core/templates/hooks"
+
+for omitted in git-cvsserver git-lfs git-filter-repo git-remote-http git-remote-https; do
+    test ! -e "$bin_dir/$omitted"
+    test ! -e "$exec_dir/$omitted"
+done
 
 if [ -n "${GIT_QUALIFY_SCRIPT:-}" ]; then
-    sh "$GIT_QUALIFY_SCRIPT" "$bin_dir"
+    sh "$GIT_QUALIFY_SCRIPT" "$prefix_dir"
 fi
 
 test_home=$(mktemp -d)
@@ -74,6 +99,24 @@ trap 'rm -rf "$test_home"' EXIT HUP INT TERM
 export HOME="$test_home"
 export XDG_CONFIG_HOME="$test_home/.config"
 export PATH="$bin_dir:$PATH"
+
+# Templates ship under share/git-core/templates; a plain `git init` must find
+# them through RUNTIME_PREFIX without --template= and copy the sample hooks.
+template_repo="$test_home/template-repo"
+mkdir "$template_repo"
+(
+    cd "$template_repo"
+    git init -q >"$test_home/init.out" 2>"$test_home/init.err"
+)
+if grep -q "templates not found" "$test_home/init.err"; then
+    echo "git init could not find the packaged templates" >&2
+    cat "$test_home/init.err" >&2
+    exit 1
+fi
+test -n "$(find "$template_repo/.git/hooks" -name '*.sample' | head -n 1)" || {
+    echo "git init did not populate hooks from the templates" >&2
+    exit 1
+}
 cat > "$test_home/footer" <<'EOF'
 Maintained by Joshua Li: https://github.com/laputa-systems/git-build
 Bugs and features: TODO.md in that repository (follow its AGENTS.md), or its issue tracker.
@@ -100,10 +143,6 @@ for output in version commands completion; do
         exit 1
     fi
 done
-# Runtime prefix only relocates when git lives in a `bin`-named directory
-# (production unpacks into ~/.local/bin). Here the bundle is in an arbitrary
-# dist dir, so point exec-path at it to exercise the submodule script.
-export GIT_EXEC_PATH="$bin_dir"
 mkdir -p "$XDG_CONFIG_HOME/git"
 : > "$XDG_CONFIG_HOME/git/config"
 
